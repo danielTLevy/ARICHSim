@@ -13,44 +13,8 @@
 #include "TMatrixT.h"
 #include "TVector3.h"
 #include "beam.h"
+#include "utility.h"
 
-TMatrixD makeRotationMatrix(TVector3 dir) {
-  // https://math.stackexchange.com/questions/180418
-  // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula#Matrix_notation
-
-  TMatrixD rot = TMatrixD(3, 3);
-  // a = (0, 0, 1)
-  // b = (dirx, diry, dirz)
-  // v = a x b = (-diry, dirx, 0)
-  TVector3 v(-dir.Y(), dir.X(), 0);
-  double s = v.Mag(); // sin(a,b) = ||v|| 
-  double c = dir.Z(); // cos(a,b) = a . b = (0,0,1) . (dirx, diry, dirz) = dirz
-
-  // rot =   I   + v    + v^2                    * (1-c)/s^2
-  TMatrixD V = TMatrixD(3, 3);
-  /*
-  V(0,0) = 0;
-  V(1,0) = v(2);
-  V(2,0) = -v(1);
-  V(0,1) = -v(2);
-  v(1,1) = 0;
-  v(2,1) = v(0);
-  v(0,2) = v(1);
-  v(1,2) = -v(0);
-  v(2,2) = 0;
-  */
-  double k = 1./(1.+c);
-  rot(0,0) = 1.0        - (v[2]*v[2]+v[1]*v[1])*k;
-  rot(0,1) =     - v[2] - (v[0]*v[1])          *k;
-  rot(0,2) =     + v[1] + (v[0]*v[2])          *k;
-  rot(1,0) =     + v[2] + (v[0]*v[1])          *k;
-  rot(1,1) = 1.0        - (v[2]*v[2]+v[0]*v[0])*k; 
-  rot(1,2) =     - v[0] - (v[2]*v[1])          *k;
-  rot(2,0) =     - v[1] - (v[0]*v[2])          *k;
-  rot(2,1) =     + v[0] + (v[1]*v[2])          *k;
-  rot(2,2) = 1.0        - (v[1]*v[1]+v[0]*v[0])*k;
-  return rot;
-}
 
 int main(int argc, char *argv[]) {
 //void calculate_pdf() {
@@ -67,10 +31,12 @@ int main(int argc, char *argv[]) {
 
   double errX = 0.0;
   double errY = 0.0;
-  double errDirX = 0.01;
-  double errDirY = 0.01;
+  double errDirX = 0.05;
+  double errDirY = 0.05;
 
-  Beam beam = Beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
+  Beam beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
+  beam.makeParticles(10000);
+  beam.plotParticles();
 
 
 
@@ -79,7 +45,7 @@ int main(int argc, char *argv[]) {
     thetaCh =  acos(1.0/(n*beta));
   }
 
-  TCanvas *c1 = new TCanvas("c1","c1",600,500);
+  TCanvas *c2 = new TCanvas("c2","c2",600,500);
   TH2D *beamHist = new TH2D("beamHist","beamHist",200,-15,15,200,-15,15);
 
   //TCanvas *c2 = new TCanvas("c2","c2",600,500);
@@ -90,6 +56,7 @@ int main(int argc, char *argv[]) {
 
   int nIter = 10000;
   //double xs[100]; double ys[100]; double ps[100]; double ts[100];
+
   for (int i = 0; i < nIter; i++) {
     // Generate particles
 
@@ -143,14 +110,6 @@ int main(int argc, char *argv[]) {
 
 
   }
-  //beamHist->SetStats(false);
-  c1->cd();
-  beamHist->Draw("colz");
-  c1->SaveAs("beamhist.pdf");
-  //c2->cd();
-  //photonHist->Draw("colz");
 
 
 };
-
-

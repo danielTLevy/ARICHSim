@@ -13,17 +13,17 @@ private:
   double errY;
   double errDirX;
   double errDirY;
-  //std::vector<Particle*> particles;
+  std::vector<Particle*> particles;
   std::shared_ptr<TRandom3> randomGenerate;
+  int n_particles = 0;
 
-  void makeParticles(int N);
 
 
 public:
   Beam(TVector3, TVector3, double, double, double, double, double);
   double getBeta();
   //std::vector<Particle> getParticles();
-  Particle generateParticle();
+  Particle* generateParticle();
   void plotParticles();
-
+  void makeParticles(int N);
 };
