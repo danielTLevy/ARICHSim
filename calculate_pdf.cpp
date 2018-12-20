@@ -12,6 +12,7 @@
 #include "TMatrixD.h"
 #include "TMatrixT.h"
 #include "TVector3.h"
+#include "beam.h"
 
 TMatrixD makeRotationMatrix(TVector3 dir) {
   // https://math.stackexchange.com/questions/180418
@@ -68,6 +69,8 @@ int main(int argc, char *argv[]) {
   double errY = 0.0;
   double errDirX = 0.01;
   double errDirY = 0.01;
+
+  Beam beam = Beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
 
 
 
