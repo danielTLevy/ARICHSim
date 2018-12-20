@@ -17,7 +17,7 @@
 
 
 int main(int argc, char *argv[]) {
-//void calculate_pdf() {
+  // Beam parameters:
   double beta = 0.9999;
   double n = 1.06;
   double dist[2] = {21.0,19.0};
@@ -28,28 +28,23 @@ int main(int argc, char *argv[]) {
   double dirY_0 = -0.1;
   double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 dir_0 = TVector3(dirX_0, dirY_0, dirZ_0);
-
   double errX = 0.0;
   double errY = 0.0;
-  double errDirX = 0.05;
-  double errDirY = 0.05;
-
+  double errDirX = 0.01;
+  double errDirY = 0.01;
+  // Generate beam
   Beam beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
   beam.makeParticles(10000);
-  beam.plotParticles();
 
-
+  TCanvas *c1 = new TCanvas("c1","c1",600,500);
+  TH2D *beamHist = beam.plotParticles();
+  TH2D *photonHist = new TH2D("photonHist","photonHist",200,-15,15,200,-15,15);
 
   double thetaCh = 0.;
   if(n*beta>=1.0){ 
     thetaCh =  acos(1.0/(n*beta));
   }
 
-  TCanvas *c2 = new TCanvas("c2","c2",600,500);
-  TH2D *beamHist = new TH2D("beamHist","beamHist",200,-15,15,200,-15,15);
-
-  //TCanvas *c2 = new TCanvas("c2","c2",600,500);
-  //TH2D *photonHist = new TH2D("photonHist","photonHist",200,-15,15,200,-15,15);
 
   std::shared_ptr<TRandom3> randomGenerate(std::make_shared<TRandom3>());
   randomGenerate->SetSeed(1);
@@ -59,7 +54,6 @@ int main(int argc, char *argv[]) {
 
   for (int i = 0; i < nIter; i++) {
     // Generate particles
-
     double paX = x_0 + randomGenerate->Gaus(0.0, errX);
     double paY = y_0 + randomGenerate->Gaus(0.0, errY);
     double paDirX = dirX_0 + randomGenerate->Gaus(0.0, errDirX);
@@ -71,7 +65,7 @@ int main(int argc, char *argv[]) {
     // optional: Project beam trajectory onto detector
     double z = dist[0];
     double r = z / cos(paTheta);
-    beamHist->Fill(paX+r*paDirX, paY+r*paDirY);
+    //beamHist->Fill(paX+r*paDirX, paY+r*paDirY);
 
 
     // Make the rotation matrix: 
@@ -105,11 +99,15 @@ int main(int argc, char *argv[]) {
       dirCR[1] = rot[1][0]*dirC[0]+rot[1][1]*dirC[1]+rot[1][2]*dirC[2];
       dirCR[2] = rot[2][0]*dirC[0]+rot[2][1]*dirC[1]+rot[2][2]*dirC[2]; 
       phIntDist = randomGenerate->Rndm()*(dist[1]-dist[0])+dist[0];
-      beamHist->Fill(phX + phIntDist*dirCR[0]/dirCR[2], phY + phIntDist*dirCR[1]/dirCR[2]);
+      photonHist->Fill(phX + phIntDist*dirCR[0]/dirCR[2], phY + phIntDist*dirCR[1]/dirCR[2]);
     }
 
 
   }
 
+    c1->cd();
+    beamHist->Draw("colz");
+    photonHist->Draw("samecolz");
+    c1->SaveAs("beamAndPhoton.pdf");
 
 };

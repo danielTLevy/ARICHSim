@@ -24,6 +24,6 @@ public:
   double getBeta();
   //std::vector<Particle> getParticles();
   Particle* generateParticle();
-  void plotParticles();
+  TH2D* plotParticles();
   void makeParticles(int N);
 };

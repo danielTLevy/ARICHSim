@@ -39,8 +39,7 @@ void Beam::makeParticles(int N) {
   n_particles = N;
 }
 
-void Beam::plotParticles() {
-  TCanvas *c1 = new TCanvas("c1","c1",600,500);
+TH2D* Beam::plotParticles() {
   TH2D *beamHist = new TH2D("beamHist2","beamHist2",200,-15,15,200,-15,15);
   for (int i = 0; i < n_particles; i++) {
     Particle p = *particles[i];
@@ -49,7 +48,5 @@ void Beam::plotParticles() {
     double r = z / cos(paTheta);
     beamHist->Fill(p.pos[0]+r*p.dir[0], p.pos[1]+r*p.dir[1]);
   }
-  c1->cd();
-  beamHist->Draw("colz");
-  c1->SaveAs("beamhist2.pdf");
+  return beamHist;
 };
