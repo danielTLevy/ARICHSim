@@ -1,6 +1,3 @@
-#include "TH2D.h"
-#include "TFile.h"
-#include "TCanvas.h"
 #include "beam.h"
 
 Beam::Beam(TVector3 pos0, TVector3 dir0, double beta, double errX, double errY, double errDirX, double errDirY) {
@@ -39,13 +36,15 @@ void Beam::makeParticles(int N) {
   n_particles = N;
 }
 
+Particle* Beam::getParticle(int i) {
+  return particles[i];
+}
+
 TH2D* Beam::plotParticles() {
   TH2D *beamHist = new TH2D("beamHist2","beamHist2",200,-15,15,200,-15,15);
   for (int i = 0; i < n_particles; i++) {
     Particle p = *particles[i];
-    double paTheta =  atan(sqrt(p.dir[0]*p.dir[0] + p.dir[1]*p.dir[1]) / p.dir[2]);
-    double z = p.pos[2];
-    double r = z / cos(paTheta);
+    double r = p.dist();
     beamHist->Fill(p.pos[0]+r*p.dir[0], p.pos[1]+r*p.dir[1]);
   }
   return beamHist;

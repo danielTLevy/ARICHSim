@@ -1,8 +1,10 @@
+#ifndef UTILITY_INCLUDE
+#define UTILITY_INCLUDE
 
 #include "TVector3.h"
 #include "TMatrixD.h"
 
-TMatrixD makeRotationMatrix(TVector3 dir) {
+static TMatrixD makeRotationMatrix(TVector3 dir) {
   // Rotation matrix to rotate (x,y,z)=(0,0,1) onto dir
   // https://math.stackexchange.com/questions/180418
   // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula#Matrix_notation
@@ -30,3 +32,5 @@ TMatrixD makeRotationMatrix(TVector3 dir) {
   rot(2,2) = 1.0        - (v[1]*v[1]+v[0]*v[0])*k;
   return rot;
 }
+
+#endif

@@ -1,7 +1,13 @@
+#ifndef BEAM_INCLUDE
+#define BEAM_INCLUDE
+
 #include "TRandom3.h"
 #include "TVector3.h"
 #include "TMatrixD.h"
 #include "particle.h"
+#include "TH2D.h"
+#include "TFile.h"
+#include "TCanvas.h"
 
 class Beam {
 private:
@@ -22,8 +28,10 @@ private:
 public:
   Beam(TVector3, TVector3, double, double, double, double, double);
   double getBeta();
-  //std::vector<Particle> getParticles();
   Particle* generateParticle();
+  Particle* getParticle(int i);
   TH2D* plotParticles();
   void makeParticles(int N);
 };
+
+#endif

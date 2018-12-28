@@ -13,7 +13,8 @@
 #include "TMatrixT.h"
 #include "TVector3.h"
 #include "beam.h"
-#include "utility.h"
+#include "aerogel.h"
+#include "particle.h"
 
 
 int main(int argc, char *argv[]) {
@@ -21,6 +22,7 @@ int main(int argc, char *argv[]) {
   double beta = 0.9999;
   double n = 1.06;
   double dist[2] = {21.0,19.0};
+  double thickness = dist[0] - dist[1];
   double x_0 = -2.0;
   double y_0 = -2.0;
   TVector3 pos_0 = TVector3(x_0, y_0, dist[0]);
@@ -33,11 +35,15 @@ int main(int argc, char *argv[]) {
   double errDirX = 0.01;
   double errDirY = 0.01;
   // Generate beam
-  Beam beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
-  beam.makeParticles(10000);
+  int nIter = 10000;
+  Beam *beam = new Beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
+  beam->makeParticles(nIter);
 
+  // Make Aerogel layer
+  Aerogel* aerogel = new Aerogel(2.0, n, dist[0], beam, beta);
+  // Get plots ready
   TCanvas *c1 = new TCanvas("c1","c1",600,500);
-  TH2D *beamHist = beam.plotParticles();
+  TH2D *beamHist = beam->plotParticles();
   TH2D *photonHist = new TH2D("photonHist","photonHist",200,-15,15,200,-15,15);
 
   double thetaCh = 0.;
@@ -49,59 +55,26 @@ int main(int argc, char *argv[]) {
   std::shared_ptr<TRandom3> randomGenerate(std::make_shared<TRandom3>());
   randomGenerate->SetSeed(1);
 
-  int nIter = 10000;
   //double xs[100]; double ys[100]; double ps[100]; double ts[100];
 
   for (int i = 0; i < nIter; i++) {
     // Generate particles
-    double paX = x_0 + randomGenerate->Gaus(0.0, errX);
-    double paY = y_0 + randomGenerate->Gaus(0.0, errY);
-    double paDirX = dirX_0 + randomGenerate->Gaus(0.0, errDirX);
-    double paDirY = dirY_0 + randomGenerate->Gaus(0.0, errDirY);
-    double paDirZ =  sqrt(1 - paDirX*paDirX - paDirY*paDirY);
-    double paTheta =  atan(sqrt(paDirX*paDirX + paDirY*paDirY) / paDirZ);
-    double paPhi = atan(paDirX / paDirY);
 
-    // optional: Project beam trajectory onto detector
-    double z = dist[0];
-    double r = z / cos(paTheta);
-    //beamHist->Fill(paX+r*paDirX, paY+r*paDirY);
+    Particle *pa = beam->getParticle(i);
 
+    std::vector<Particle*> photons = aerogel->generatePhotons(pa);
 
-    // Make the rotation matrix: 
-    TVector3 paDir(paDirX, paDirY, paDirZ);
-    TMatrixD rot = makeRotationMatrix(paDir);
+    for (int j = 0; j < photons.size(); j++) {
 
-    // dist travelled through the aerogel by particle
-    double paDist = (dist[0] - dist[1]) / cos(paTheta);
+      Particle* ph = photons[j];
 
-    // Generate photons
-    int nPhotons = 10;
-    for (int j = 0; j < nPhotons; j++) {
-      // Distance into aerogel that photon is emitted
-      double phIntDist = randomGenerate->Uniform(paDist);
-      double phIntR = r - phIntDist;
+      TVector3 phPos = ph->pos;
+      TVector3 phDir = ph->dir;
 
-      double phX = paX+phIntDist*sin(paTheta)*cos(paPhi);
-      double phY = paY+phIntDist*sin(paTheta)*sin(paPhi);
+      double phDist = ph->dist();
+      photonHist->Fill(phPos[0] + phDist*phDir[0]/phDir[2], phPos[1] + phDist*phDir[1]/phDir[2]);
 
-      // Photons
-      double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-
-      TVector3 dirC;
-      TVector3 dirCR;
-      dirC.SetX(cos(phPhi)*sin(thetaCh)); 
-      dirC.SetY(sin(phPhi)*sin(thetaCh));  
-      dirC.SetZ(cos(thetaCh));
-      // x y z of cherenkov rotated onto particle
-      //TVector3 dirCR = rot * dirC;
-      dirCR[0] = rot[0][0]*dirC[0]+rot[0][1]*dirC[1]+rot[0][2]*dirC[2]; 
-      dirCR[1] = rot[1][0]*dirC[0]+rot[1][1]*dirC[1]+rot[1][2]*dirC[2];
-      dirCR[2] = rot[2][0]*dirC[0]+rot[2][1]*dirC[1]+rot[2][2]*dirC[2]; 
-      phIntDist = randomGenerate->Rndm()*(dist[1]-dist[0])+dist[0];
-      photonHist->Fill(phX + phIntDist*dirCR[0]/dirCR[2], phY + phIntDist*dirCR[1]/dirCR[2]);
     }
-
 
   }
 
