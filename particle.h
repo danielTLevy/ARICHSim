@@ -5,10 +5,9 @@
 
 class Particle {
 public:
-  Particle(TVector3, TVector3, double);
+  Particle(TVector3, TVector3);
   TVector3 pos;
   TVector3 dir;
-  double beta;
   double theta();
   double phi();
   double dist();

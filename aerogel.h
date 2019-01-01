@@ -16,6 +16,7 @@
 #include "TSpline.h"
 #include "beam.h"
 #include "photon.h"
+#include "particle.h"
 #include "utility.h"
 
 class Aerogel {
@@ -35,7 +36,7 @@ public:
   double getRefractiveIndex();
   double getThickness();
   double getDistance();
-  std::vector<Particle*> generatePhotons(Particle* pa);
+  std::vector<Photon*> generatePhotons(Particle* pa);
 };
 
 #endif

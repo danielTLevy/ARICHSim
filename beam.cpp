@@ -26,7 +26,7 @@ Particle* Beam::generateParticle() {
   double paDirZ =  sqrt(1 - paDirX*paDirX - paDirY*paDirY);
   TVector3 dir = TVector3(paDirX, paDirY, paDirZ);
 
-  return new Particle(pos, dir, beta);
+  return new Particle(pos, dir);
 }
 
 void Beam::makeParticles(int N) {

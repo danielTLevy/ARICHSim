@@ -15,18 +15,19 @@
 #include "beam.h"
 #include "aerogel.h"
 #include "particle.h"
+#include "photon.h"
 
 
 int main(int argc, char *argv[]) {
   // Beam parameters:
-  double beta = 0.9999;
+  double beta = 0.99;
   double n = 1.06;
   double dist[2] = {21.0,19.0};
   double thickness = dist[0] - dist[1];
-  double x_0 = -2.0;
+  double x_0 = -3.0;
   double y_0 = -2.0;
   TVector3 pos_0 = TVector3(x_0, y_0, dist[0]);
-  double dirX_0 = 0.01;
+  double dirX_0 = 0.05;
   double dirY_0 = -0.1;
   double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 dir_0 = TVector3(dirX_0, dirY_0, dirZ_0);
@@ -46,15 +47,6 @@ int main(int argc, char *argv[]) {
   TH2D *beamHist = beam->plotParticles();
   TH2D *photonHist = new TH2D("photonHist","photonHist",200,-15,15,200,-15,15);
 
-  double thetaCh = 0.;
-  if(n*beta>=1.0){ 
-    thetaCh =  acos(1.0/(n*beta));
-  }
-
-
-  std::shared_ptr<TRandom3> randomGenerate(std::make_shared<TRandom3>());
-  randomGenerate->SetSeed(1);
-
   //double xs[100]; double ys[100]; double ps[100]; double ts[100];
 
   for (int i = 0; i < nIter; i++) {
@@ -62,12 +54,10 @@ int main(int argc, char *argv[]) {
 
     Particle *pa = beam->getParticle(i);
 
-    std::vector<Particle*> photons = aerogel->generatePhotons(pa);
+    std::vector<Photon*> photons = aerogel->generatePhotons(pa);
 
     for (int j = 0; j < photons.size(); j++) {
-
-      Particle* ph = photons[j];
-
+      Photon* ph = photons[j];
       TVector3 phPos = ph->pos;
       TVector3 phDir = ph->dir;
 

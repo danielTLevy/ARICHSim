@@ -24,14 +24,14 @@ double Aerogel::getDistance() {
   return dist;
 }
 
-std::vector<Particle*> Aerogel::generatePhotons(Particle* pa) {
+std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
   TMatrixD rot = makeRotationMatrix(pa->dir);
   double paTheta = pa->theta();
   double paPhi = pa->phi();
   double r = dist / cos(paTheta);
   double paDist = thickness / cos(paTheta);
 
-  std::vector<Particle*> photons;
+  std::vector<Photon*> photons;
   int nPhotons = 10;
   photons.reserve(nPhotons);
 
@@ -62,7 +62,7 @@ std::vector<Particle*> Aerogel::generatePhotons(Particle* pa) {
     dirCR[1] = rot[1][0]*dirC[0]+rot[1][1]*dirC[1]+rot[1][2]*dirC[2];
     dirCR[2] = rot[2][0]*dirC[0]+rot[2][1]*dirC[1]+rot[2][2]*dirC[2];
 
-    Particle* photon = new Particle(phPos, dirCR, 1);
+    Photon* photon = new Photon(phPos, dirCR, 500);
 
     photons.push_back(photon);
   }
