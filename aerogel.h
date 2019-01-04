@@ -29,11 +29,15 @@ private:
   double chAngle = 0.0;
   TF1 *wavPdf;
   std::shared_ptr<TRandom3> randomGenerate;
+  double dNdX;
+
   static double calcChAngle(double, double);
   std::vector<double> getRandomTheta(int);
   std::vector<double> getRandomEnergy(int, double, double);
   static TF1* calcWavPdf(double, double);
+  static double calcdNdX(double, double);
   double getRandomWav();
+  int calcNumPhotons(double);
 
 public:
   Aerogel(double, double, double, Beam*, double);

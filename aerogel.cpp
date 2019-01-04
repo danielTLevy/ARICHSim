@@ -9,6 +9,7 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, Beam* be
   this->beam = beam;
   this->chAngle = calcChAngle(refractiveIndex, beta);
   this->wavPdf = calcWavPdf(refractiveIndex, beta);
+  this->dNdX = calcdNdX(refractiveIndex, beta);
 }
 
 
@@ -26,6 +27,13 @@ TF1* Aerogel::calcWavPdf(double n, double beta) {
   return pdf;
 }
 
+double Aerogel::calcdNdX(double n, double beta) {
+  double alpha = 1./137;
+  double lowWav = 300E-9;
+  double highWav = 700E-9; // TODO: make these constants!
+  return 2*TMath::Pi()*alpha*(1. - 1./(n*beta*n*beta))*(1./lowWav - 1./highWav);
+}
+
 double Aerogel::getRandomWav() {
   return wavPdf->GetRandom();
 }
@@ -38,12 +46,14 @@ double Aerogel::getRefractiveIndex() {
   return refractiveIndex;
 }
 
-
 double Aerogel::getDistance() {
   return dist;
 }
 
-
+int Aerogel::calcNumPhotons(double particleDist) {
+  // N ~= dN/dX * X (in meters)
+  return particleDist*0.01*dNdX;
+}
 
 std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
   TMatrixD rot = makeRotationMatrix(pa->dir);
@@ -53,7 +63,10 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
   double paDist = thickness / cos(paTheta);
 
   std::vector<Photon*> photons;
-  int nPhotons = 10;
+
+  int nPhotons = calcNumPhotons(paDist);
+
+
   photons.reserve(nPhotons);
 
   for (int i = 0; i < nPhotons; i++) {
