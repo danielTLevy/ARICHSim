@@ -7,9 +7,28 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, Beam* be
   this->refractiveIndex = refractiveIndex;
   this->dist = dist;
   this->beam = beam;
-  this->chAngle = acos(1.0 / (refractiveIndex * beta));
+  this->chAngle = calcChAngle(refractiveIndex, beta);
+  this->wavPdf = calcWavPdf(refractiveIndex, beta);
 }
 
+
+double Aerogel::calcChAngle(double n, double beta) {
+  return acos(1.0 / (n * beta));
+}
+
+TF1* Aerogel::calcWavPdf(double n, double beta) {
+  double alpha = 1./137; // fine structure constant
+  TF1 *pdf = new TF1("pdf", "2*TMath::Pi()*[0]*(1. - 1./([1]*[2]*[1]*[2]))*1./(x*x)",
+                      300E-9, 700E-9);
+  pdf->SetParameter(0, alpha); pdf->SetParName(0, "alpha");
+  pdf->SetParameter(1, n); pdf->SetParName(1, "n");
+  pdf->SetParameter(2, beta); pdf->SetParName(1, "beta");
+  return pdf;
+}
+
+double Aerogel::getRandomWav() {
+  return wavPdf->GetRandom();
+}
 
 double Aerogel::getThickness() {
   return thickness;
@@ -23,6 +42,8 @@ double Aerogel::getRefractiveIndex() {
 double Aerogel::getDistance() {
   return dist;
 }
+
+
 
 std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
   TMatrixD rot = makeRotationMatrix(pa->dir);
@@ -62,7 +83,9 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
     dirCR[1] = rot[1][0]*dirC[0]+rot[1][1]*dirC[1]+rot[1][2]*dirC[2];
     dirCR[2] = rot[2][0]*dirC[0]+rot[2][1]*dirC[1]+rot[2][2]*dirC[2];
 
-    Photon* photon = new Photon(phPos, dirCR, 500);
+    double wav = getRandomWav();
+
+    Photon* photon = new Photon(phPos, dirCR, wav);
 
     photons.push_back(photon);
   }
