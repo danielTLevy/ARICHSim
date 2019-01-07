@@ -38,13 +38,17 @@ private:
   static double calcdNdX(double, double);
   double getRandomWav();
   int calcNumPhotons(double);
+  double getRandomScatAngle(double);
+  double getRandomIntDistance(double);
+  double getDistInGel(Particle*);
 
 public:
   Aerogel(double, double, double, Beam*, double);
   double getRefractiveIndex();
   double getThickness();
   double getDistance();
-  std::vector<Photon*> generatePhotons(Particle* pa);
+  void applyPhotonScatter(Photon*);
+  std::vector<Photon*> generatePhotons(Particle*);
 };
 
 #endif
