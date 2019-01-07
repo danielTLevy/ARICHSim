@@ -30,7 +30,7 @@ public:
   double getBeta();
   Particle* generateParticle();
   Particle* getParticle(int i);
-  TH2D* plotParticles();
+  TH2D* plotParticles(double);
   void makeParticles(int N);
 };
 

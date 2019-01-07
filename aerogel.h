@@ -25,7 +25,6 @@ private:
   double refractiveIndex=0.0;
   double thickness=0.0;
   double dist=0.0;
-  Beam* beam;
   double chAngle = 0.0;
   TF1 *wavPdf;
   std::shared_ptr<TRandom3> randomGenerate;
@@ -43,7 +42,7 @@ private:
   double getDistInGel(Particle*);
 
 public:
-  Aerogel(double, double, double, Beam*, double);
+  Aerogel(double, double, double, double);
   double getRefractiveIndex();
   double getThickness();
   double getDistance();

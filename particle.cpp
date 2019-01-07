@@ -10,9 +10,10 @@ double Particle::theta() {
 }
 
 double Particle::phi() {
-  return  atan(dir[0] / dir[1]);
+  return atan(dir[0] / dir[1]);
 }
 
-double Particle::dist() {
-  return pos[2] / cos(theta());
+double Particle::dist(double z) {
+  // distance to plane in direction of travel
+  return (z - pos[2]) / cos(theta());
 }

@@ -1,12 +1,11 @@
 #include "aerogel.h"
 
-Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, Beam* beam, double beta) {
+Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, double beta) {
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
   this->thickness = thickness;
   this->refractiveIndex = refractiveIndex;
   this->dist = dist;
-  this->beam = beam;
   this->chAngle = calcChAngle(refractiveIndex, beta);
   this->wavPdf = calcWavPdf(refractiveIndex, beta);
   this->dNdX = calcdNdX(refractiveIndex, beta);
@@ -50,7 +49,7 @@ double Aerogel::getDistance() {
 
 double Aerogel::getDistInGel(Particle* pa) {
   // calculate how far a particle has remaining in the gel
-  return (thickness + pa->pos[2] - dist) / cos(pa->theta());
+  return (thickness - pa->pos[2]) / cos(pa->theta());
 
 }
 
@@ -87,52 +86,23 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
 }
 
 std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
-  TMatrixD rot = makeRotationMatrix(pa->dir);
-  double paTheta = pa->theta();
-  double paPhi = pa->phi();
-  double r = dist / cos(paTheta);
+  // Create Cherenkov photons as the particle passes through the gel
+  TMatrixD rotMatrix = makeRotationMatrix(pa->dir);
   double paDist = getDistInGel(pa);
 
   std::vector<Photon*> photons;
-
   int nPhotons = calcNumPhotons(paDist);
-
-
   photons.reserve(nPhotons);
-
   for (int i = 0; i < nPhotons; i++) {
-
     double phIntDist = randomGenerate->Uniform(paDist);
-    double phIntR = r - phIntDist;
-
-    double phX = pa->pos[0] + phIntDist*sin(paTheta)*cos(paPhi);
-    double phY = pa->pos[1] + phIntDist*sin(paTheta)*sin(paPhi);
-    TVector3 phPos;
-    phPos[0] = pa->pos[0] + phIntDist*sin(paTheta)*cos(paPhi);
-    phPos[1] = pa->pos[1] + phIntDist*sin(paTheta)*sin(paPhi);
-    phPos[2] = phIntR * cos(paTheta);
-    // Photons
+    TVector3 phPos = pa->pos + phIntDist*pa->dir;
     double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-
-    TVector3 dirC;
-    TVector3 dirCR;
-    // Beam frame angle of photon
-    dirC.SetX(cos(phPhi)*sin(chAngle));
-    dirC.SetY(sin(phPhi)*sin(chAngle));
-    dirC.SetZ(cos(chAngle));
-
-    // photon direction rotated onto particle direction
-    //TVector3 dirCR = rot * dirC;
-    dirCR[0] = rot[0][0]*dirC[0]+rot[0][1]*dirC[1]+rot[0][2]*dirC[2];
-    dirCR[1] = rot[1][0]*dirC[0]+rot[1][1]*dirC[1]+rot[1][2]*dirC[2];
-    dirCR[2] = rot[2][0]*dirC[0]+rot[2][1]*dirC[1]+rot[2][2]*dirC[2];
-
+    TVector3 dirCR = rotateVector(rotMatrix, chAngle, phPhi);
     double wav = getRandomWav();
-
     Photon* photon = new Photon(phPos, dirCR, wav);
-
     photons.push_back(photon);
   }
+
   return photons;
 
 }

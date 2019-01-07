@@ -40,12 +40,12 @@ Particle* Beam::getParticle(int i) {
   return particles[i];
 }
 
-TH2D* Beam::plotParticles() {
+TH2D* Beam::plotParticles(double z) {
   TH2D *beamHist = new TH2D("beamHist2","beamHist2",200,-15,15,200,-15,15);
   for (int i = 0; i < n_particles; i++) {
     Particle p = *particles[i];
-    double r = p.dist();
+    double r = p.dist(z);
     beamHist->Fill(p.pos[0]+r*p.dir[0], p.pos[1]+r*p.dir[1]);
   }
   return beamHist;
-};
+}; 

@@ -17,7 +17,7 @@ SOURCES = $(wildcard *.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 
 $(EXEC): $(OJECTS)
-	$(CC)  $(CC_FLAGS) -fPIC $(LDFLAGS) $(R_ALL) $(B_FLAGS)  -c $(SOURCES)
+	$(CC)  $(CC_FLAGS) -fPIC $(R_LDFLAGS) $(R_ALL) $(B_FLAGS)  -c $(SOURCES)
 	$(CC)  $(P_CC_FLAG) $(CC_FLAGS) $(R_ALL) $(G_FLAGS) $(B_FLAGS) $(OBJECTS) -o final.out
 
 # To remove generated files

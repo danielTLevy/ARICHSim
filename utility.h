@@ -33,4 +33,21 @@ static TMatrixD makeRotationMatrix(TVector3 dir) {
   return rot;
 }
 
+static TVector3 rotateVector(TMatrixD rot, double theta, double phi) {
+  // Apply a rotation matrix to a theta and phi
+  TVector3 dir;
+  TVector3 dirRot;
+  // Beam frame angle of photon
+  dir.SetX(cos(phi)*sin(theta));
+  dir.SetY(sin(phi)*sin(theta));
+  dir.SetZ(cos(theta));
+
+  // photon direction rotated onto particle direction
+  //TVector3 dirRot = rot * dir;
+  dirRot[0] = rot[0][0]*dir[0]+rot[0][1]*dir[1]+rot[0][2]*dir[2];
+  dirRot[1] = rot[1][0]*dir[0]+rot[1][1]*dir[1]+rot[1][2]*dir[2];
+  dirRot[2] = rot[2][0]*dir[0]+rot[2][1]*dir[1]+rot[2][2]*dir[2];
+  return dirRot;
+}
+
 #endif

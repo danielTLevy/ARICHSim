@@ -10,7 +10,8 @@ public:
   TVector3 dir;
   double theta();
   double phi();
-  double dist();
+  double dist(double);
+  void travelDist(double);
 };
 
 #endif
