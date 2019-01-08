@@ -27,6 +27,7 @@ private:
   double dist=0.0;
   double chAngle = 0.0;
   TF1 *wavPdf;
+  TF1 *scatAngleFunc;
   std::shared_ptr<TRandom3> randomGenerate;
   double dNdX;
 
@@ -37,9 +38,8 @@ private:
   static double calcdNdX(double, double);
   double getRandomWav();
   int calcNumPhotons(double);
-  double getRandomScatAngle(double);
+  double getRandomScatAngle();
   double getRandomIntDistance(double);
-  double getDistInGel(Particle*);
 
 public:
   Aerogel(double, double, double, double);
@@ -48,6 +48,8 @@ public:
   double getDistance();
   void applyPhotonScatter(Photon*);
   std::vector<Photon*> generatePhotons(Particle*);
+  double getDistInGel(Particle*);
+
 };
 
 #endif

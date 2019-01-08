@@ -1,5 +1,6 @@
 #include "aerogel.h"
 
+
 Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, double beta) {
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
@@ -8,6 +9,7 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, double b
   this->dist = dist;
   this->chAngle = calcChAngle(refractiveIndex, beta);
   this->wavPdf = calcWavPdf(refractiveIndex, beta);
+  this->scatAngleFunc = new TF1("scatPdf", "(1 + pow(cos(x), 2))", 0, 2*TMath::Pi());
   this->dNdX = calcdNdX(refractiveIndex, beta);
 }
 
@@ -49,7 +51,7 @@ double Aerogel::getDistance() {
 
 double Aerogel::getDistInGel(Particle* pa) {
   // calculate how far a particle has remaining in the gel
-  return (thickness - pa->pos[2]) / cos(pa->theta());
+  return abs((thickness - pa->pos[2]) / cos(pa->theta()));
 
 }
 
@@ -61,27 +63,32 @@ int Aerogel::calcNumPhotons(double particleDist) {
 double Aerogel::getRandomIntDistance(double wav) {
   // TODO: use transmission distance to calculate random interaction distance
   // by sampling from exponential function
-  return 3;
+  return randomGenerate->Uniform(0.,4.);
 }
 
-double Aerogel::getRandomScatAngle(double wav) {
-  // Rayleigh scattering is proportional to the inverse 4th power of the wavelength
-  // and 1 + cos^2(theta)
-  TF1 *scatPdf = new TF1("scatPdf", "(1 + pow(cos(x), 2))*pow([0], -4)",
-                     0, 2*TMath::Pi());
-  scatPdf->SetParameter(0, wav);
-  return scatPdf->GetRandom();
+double Aerogel::getRandomScatAngle() {
+  // Rayleigh scattering is proportional to  1 + cos^2(theta)
+  return scatAngleFunc->GetRandom();
 }
 
 void Aerogel::applyPhotonScatter(Photon* photon) {
-  // continuously scatter photon until it exits gel
-  double intLength = getRandomIntDistance(photon->wav);
-  double dist = getDistInGel(photon);
-  while (intLength < dist) {
-    double scatAngle = getRandomScatAngle(photon->wav);
-    photon->dir = photon->dir;     // TODO: apply new theta
-    double intLength = getRandomIntDistance(photon->wav);
-    double dist = getDistInGel(photon);
+  // Continuously scatter photon while the distance travelled before interacting
+  // is less than the distance to exit the gel
+  double intDist = getRandomIntDistance(photon->wav);
+  double gelDist = getDistInGel(photon);
+
+  while ((intDist < gelDist) && (photon->numScatters <= 100)) {
+    // update position
+    photon->pos = photon->pos + intDist*photon->dir;
+    // update direction
+    TMatrixD rotMatrix = makeRotationMatrix(photon->dir);
+    double scatTheta = getRandomScatAngle();
+    double scatPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
+    photon->dir = rotateVector(rotMatrix, scatTheta, scatPhi);
+
+    photon->numScatters += 1;
+    intDist = getRandomIntDistance(photon->wav);
+    gelDist = getDistInGel(photon);
   }
 }
 
@@ -94,12 +101,18 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
   int nPhotons = calcNumPhotons(paDist);
   photons.reserve(nPhotons);
   for (int i = 0; i < nPhotons; i++) {
+    // Get the point where the photon was emitted
     double phIntDist = randomGenerate->Uniform(paDist);
     TVector3 phPos = pa->pos + phIntDist*pa->dir;
+    // Get the direection of the new photon
     double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
     TVector3 dirCR = rotateVector(rotMatrix, chAngle, phPhi);
+    // Get the wavelength of the photon
     double wav = getRandomWav();
+
     Photon* photon = new Photon(phPos, dirCR, wav);
+
+    applyPhotonScatter(photon);
     photons.push_back(photon);
   }
 
