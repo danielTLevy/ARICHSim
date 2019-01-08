@@ -55,7 +55,29 @@ int main(int argc, char *argv[]) {
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
   TH1D *distHist = new TH1D("distHist", "distHist", 200, 0., 5.);
 
+
+
+  struct photonStruct {
+    double dirx;
+    double diry;
+    double dirz;
+    double posx;
+    double posy;
+    double posz;
+  };
+  photonStruct photonst;
+
+  // Make a tree to save the photons
+  TFile *f = new TFile("photons.root","RECREATE");
+  TTree *tree = new TTree("T","Output photon data");
+  tree->Branch("photons",&photonst.dirx,"dirx/d:diry:dirz:posx:posy:posz");
+
   Photon* ph;
+
+
+
+
+
   for (int i = 0; i < nIter; i++) {
     // Generate particles
 
@@ -66,6 +88,14 @@ int main(int argc, char *argv[]) {
       TVector3 phPos = ph->pos;
       TVector3 phDir = ph->dir;
       double phDist = ph->dist(dist);
+
+      photonst.dirx = phDir[0];
+      photonst.diry = phDir[1];
+      photonst.dirz = phDir[2];
+      photonst.posx = phPos[0];
+      photonst.posy = phPos[1];
+      photonst.posz = phPos[2];
+      tree->Fill();
       photonHist->Fill(phPos[0] + phDist*phDir[0]/phDir[2], phPos[1] + phDist*phDir[1]/phDir[2]);
       scatterHist->Fill(ph->numScatters);
       distHist->Fill(aerogel->getDistInGel(ph));
@@ -93,5 +123,8 @@ int main(int argc, char *argv[]) {
   //c2->SetLogy();
   distHist->Draw();
   c3->SaveAs("./output/distHist.pdf");
+
+  f->Write();
+  tree->Print();
   return 0;
 };
