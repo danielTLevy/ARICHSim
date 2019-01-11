@@ -52,7 +52,6 @@ double Aerogel::getDistance() {
 double Aerogel::getDistInGel(Particle* pa) {
   // calculate how far a particle has remaining in the gel
   return abs((thickness - pa->pos[2]) / cos(pa->theta()));
-
 }
 
 int Aerogel::calcNumPhotons(double particleDist) {
