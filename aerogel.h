@@ -30,7 +30,10 @@ private:
   TF1 *scatAngleFunc;
   std::shared_ptr<TRandom3> randomGenerate;
   double dNdX;
+  std::vector<double> interactionLengths;
+  TF1 *interactionDistFunc;
 
+  static std::vector<double> readInteractionLength(double);
   static double calcChAngle(double, double);
   std::vector<double> getRandomTheta(int);
   std::vector<double> getRandomEnergy(int, double, double);
@@ -39,6 +42,7 @@ private:
   double getRandomWav();
   int calcNumPhotons(double);
   double getRandomScatAngle();
+  double getIntLengthForWav(double);
   double getRandomIntDistance(double);
 
 public:

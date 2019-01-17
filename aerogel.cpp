@@ -1,6 +1,5 @@
 #include "aerogel.h"
 
-
 Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, double beta) {
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
@@ -11,6 +10,9 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, double b
   this->wavPdf = calcWavPdf(refractiveIndex, beta);
   this->scatAngleFunc = new TF1("scatPdf", "(1 + pow(cos(x), 2))", 0, 2*TMath::Pi());
   this->dNdX = calcdNdX(refractiveIndex, beta);
+  this->interactionLengths = readInteractionLength(refractiveIndex);
+  this->interactionDistFunc = new TF1("scatPdf", "[0]*exp(-[0]/x)/(x*x)", 0., 6.);
+  this->interactionDistFunc->SetParameter(0, 2.);
 }
 
 
@@ -31,6 +33,39 @@ double Aerogel::calcdNdX(double n, double beta) {
   double lowWav = 300E-9;
   double highWav = 700E-9; // TODO: make these constants!
   return 2*TMath::Pi()*alpha*(1. - 1./(n*beta*n*beta))*(1./lowWav - 1./highWav);
+}
+
+std::vector<double> Aerogel::readInteractionLength(double n) {
+  std::string files[5] = {"leps1-1b","btr4-1a","hds2-3b","leps2-1a","leps6-1a"};
+  float ns[5] = {1.0505,1.0452,1.0401,1.0352,1.0297};
+  // Get nearest index of refraction
+  float minDiff = 1.;
+  int minI = 0;
+  for (int i = 0; i < 5; i++) {
+    if (abs(n - ns[i]) < minDiff) {
+      minDiff = abs(n - ns[i]);
+      minI = i;
+    }
+  }
+  // Get the corresponding file of interaction lengths
+  std::string fileName = "./data/" + files[minI] + "IntLength.csv";
+  std::cout << fileName << std::endl;
+
+  std::ifstream intLengthFile(fileName);
+
+  std::vector<double> wavs;
+  std::vector<double> intLengths;
+  std::string line;
+
+  while(std::getline(intLengthFile,line, '\n')) {
+    std::string wavString = line.substr(0, line.find(' '));
+    std::string intLengthString = line.substr(line.find(' ')+1, -1);
+
+    wavs.push_back(atof(wavString.c_str()));
+    intLengths.push_back(atof(intLengthString.c_str()));
+  }
+
+  return intLengths;
 }
 
 double Aerogel::getRandomWav() {
@@ -59,10 +94,21 @@ int Aerogel::calcNumPhotons(double particleDist) {
   return particleDist*0.01*dNdX;
 }
 
+double Aerogel::getIntLengthForWav(double wav) {
+  // Get index of nearest wavelengths
+  double maxWav = 800.;
+  double deltaWav = 0.5;
+  wav = wav*1E9; // convert to nm
+  int index = floor((maxWav - wav)/deltaWav);
+
+  return interactionLengths[index];
+}
+
 double Aerogel::getRandomIntDistance(double wav) {
-  // TODO: use transmission distance to calculate random interaction distance
-  // by sampling from exponential function
-  return randomGenerate->Uniform(0.,4.);
+  double intLength = getIntLengthForWav(wav);
+  // TODO: THIS IS UNREASONABLY SLOW
+  interactionDistFunc->SetParameter(0, intLength);
+  return interactionDistFunc->GetRandom();
 }
 
 double Aerogel::getRandomScatAngle() {
