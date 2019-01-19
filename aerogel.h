@@ -31,7 +31,6 @@ private:
   std::shared_ptr<TRandom3> randomGenerate;
   double dNdX;
   std::vector<double> interactionLengths;
-  TF1 *interactionDistFunc;
 
   static std::vector<double> readInteractionLength(double);
   static double calcChAngle(double, double);

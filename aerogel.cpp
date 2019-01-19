@@ -11,8 +11,6 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, double b
   this->scatAngleFunc = new TF1("scatPdf", "(1 + pow(cos(x), 2))", 0, 2*TMath::Pi());
   this->dNdX = calcdNdX(refractiveIndex, beta);
   this->interactionLengths = readInteractionLength(refractiveIndex);
-  this->interactionDistFunc = new TF1("scatPdf", "[0]*exp(-[0]/x)/(x*x)", 0., 6.);
-  this->interactionDistFunc->SetParameter(0, 2.);
 }
 
 
@@ -106,9 +104,12 @@ double Aerogel::getIntLengthForWav(double wav) {
 
 double Aerogel::getRandomIntDistance(double wav) {
   double intLength = getIntLengthForWav(wav);
-  // TODO: THIS IS UNREASONABLY SLOW
-  interactionDistFunc->SetParameter(0, intLength);
-  return interactionDistFunc->GetRandom();
+  // Our CDF is exp(-intLength / x)
+  // Sample randomly for value of CDF
+  // Invert the equation to get the x value that would get this random value
+  double randY = randomGenerate->Uniform(0,1);
+  return - intLength / log(randY);
+
 }
 
 double Aerogel::getRandomScatAngle() {
