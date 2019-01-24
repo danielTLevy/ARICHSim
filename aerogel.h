@@ -17,7 +17,7 @@ class Aerogel {
 private:
   double refractiveIndex=0.0;
   double thickness=0.0;
-  double dist=0.0;
+  double zPos=0.0;
   double chAngle = 0.0;
   TF1 *wavPdf;
   TF1 *scatAngleFunc;
@@ -43,7 +43,7 @@ public:
 
   double getRefractiveIndex();
   double getThickness();
-  double getDistance();
+  double getZPos();
   void applyPhotonScatters(std::vector<Photon*>);
   std::vector<Photon*> generatePhotons(Particle*);
   double getDistInGel(Particle*);

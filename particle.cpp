@@ -21,7 +21,16 @@ double Particle::dist(double z) {
 }
 
 void Particle::travelDist(double dist) {
-	pos[0] = pos[0] + dist*dir[0];
-	pos[1] = pos[1] + dist*dir[1];
-	pos[2] = pos[2] + dist*dir[2];
+  // Travel some distance in the direction of travel
+  pos[0] = pos[0] + dist*dir[0];
+  pos[1] = pos[1] + dist*dir[1];
+  pos[2] = pos[2] + dist*dir[2];
+}
+
+
+void Particle::travelZDist(double zDist) {
+  // Travel some distance in the direction of travel
+  pos[0] = pos[0] + zDist*dir[0]/dir[2];
+  pos[1] = pos[1] + zDist*dir[1]/dir[2];
+  pos[2] = pos[2] + zDist;
 }

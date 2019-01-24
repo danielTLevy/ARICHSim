@@ -1,11 +1,11 @@
 #include "aerogel.h"
 
-Aerogel::Aerogel(double thickness, double refractiveIndex, double dist, double beta) {
+Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double beta) {
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
   this->thickness = thickness;
   this->refractiveIndex = refractiveIndex;
-  this->dist = dist;
+  this->zPos = zPos;
   this->chAngle = calcChAngle(refractiveIndex, beta);
   this->wavPdf = calcWavPdf(refractiveIndex, beta);
   this->scatAngleFunc = new TF1("scatPdf", "(1 + pow(cos(x), 2))", 0, 2*TMath::Pi());
@@ -78,13 +78,13 @@ double Aerogel::getRefractiveIndex() {
   return refractiveIndex;
 }
 
-double Aerogel::getDistance() {
-  return dist;
+double Aerogel::getZPos() {
+  return zPos;
 }
 
 double Aerogel::getDistInGel(Particle* pa) {
   // calculate how far a particle has remaining in the gel
-  return abs((thickness - pa->pos[2]) / pa->dir[2]);
+  return abs((zPos + thickness - pa->pos[2]) / pa->dir[2]);
 }
 
 int Aerogel::calcNumPhotons(double particleDist) {

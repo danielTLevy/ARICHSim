@@ -14,6 +14,8 @@ public:
   double phi();
   double dist(double);
   void travelDist(double);
+  void travelZDist(double);
+
 };
 
 #endif

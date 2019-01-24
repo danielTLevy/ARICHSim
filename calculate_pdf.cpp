@@ -10,7 +10,6 @@
 #include "TGraph.h"
 #include "TCanvas.h"
 #include "TRandom3.h"
-#include "TEllipse.h"
 #include "TVector3.h"
 #include "TMatrixD.h"
 #include "TMatrixT.h"
@@ -58,7 +57,7 @@ int main(int argc, char *argv[]) {
   // Beam parameters:
   double beta = 0.99; // velocity of particle
   double n1 = 1.035; // index of refraction
-  double n2 = 1.05; // index of refraction
+  double n2 = 1.045; // index of refraction
 
   double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
   double dist = 21.0; // dist to detector plane
@@ -66,7 +65,7 @@ int main(int argc, char *argv[]) {
   double x_0 = -0.0; // beam initial position
   double y_0 = -0.0;
   TVector3 pos_0 = TVector3(x_0, y_0, 0);
-  double dirX_0 = 0.4; // beam initial direction
+  double dirX_0 = 0.2; // beam initial direction
   double dirY_0 = -0.00;
   double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 dir_0 = TVector3(dirX_0, dirY_0, dirZ_0);
@@ -81,8 +80,8 @@ int main(int argc, char *argv[]) {
   beam->makeParticles(nIter);
 
   // Make Aerogel layer
-  Aerogel* aerogel1 = new Aerogel(thickness, n1, dist-aeroPos[0], beta);
-  Aerogel* aerogel2 = new Aerogel(thickness, n2, dist-aeroPos[1], beta);
+  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
+  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
 
   // Get plots ready
   TH2D *beamHist = beam->plotParticles(dist);
@@ -114,8 +113,20 @@ int main(int argc, char *argv[]) {
     paBranch->Fill();
     numPhotonHist->Fill(aerogel1->getDistInGel(pa));
 
-    std::vector<Photon*> photons = aerogel1->generatePhotons(pa);
-    aerogel1->applyPhotonScatters(photons);
+    // Make photons in first aerogel and scatter them
+    std::vector<Photon*> photons1 = aerogel1->generatePhotons(pa);
+    aerogel1->applyPhotonScatters(photons1);
+    // Advance particle forward to next aerogel and generate photons
+    pa->travelZDist(aeroPos[1] - aeroPos[0]);
+    std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa);
+
+    // Combine photons from both aerogels
+    std::vector<Photon*> photons;
+    photons.reserve(photons1.size() + photons2.size());
+    photons.insert(photons.end(), photons1.begin(), photons1.end());
+    photons.insert(photons.end(), photons2.begin(), photons2.end());
+    // Include scattering in second aerogel
+    aerogel2->applyPhotonScatters(photons);
 
     for (int j = 0; j < photons.size(); j++) {
       Photon* ph = photons[j];
@@ -133,7 +144,6 @@ int main(int argc, char *argv[]) {
       photonHist->Fill(phPos[0] + phDist*phDir[0], phPos[1] + phDist*phDir[1]);
 
       scatterHist->Fill(ph->numScatters);
-      distHist->Fill(aerogel1->getDistInGel(ph));
     }
 
   }
