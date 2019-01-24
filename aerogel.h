@@ -2,13 +2,6 @@
 #define AEROGEL_INCLUDE
 
 #include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <math.h>
-#include <numeric>
-#include <string>
-#include <vector>
-#include <memory>
 
 //Root
 #include "TMath.h"
@@ -39,17 +32,19 @@ private:
   static TF1* calcWavPdf(double, double);
   static double calcdNdX(double, double);
   double getRandomWav();
-  int calcNumPhotons(double);
   double getRandomScatAngle();
+  void applyPhotonScatter(Photon*);
   double getIntLengthForWav(double);
   double getRandomIntDistance(double);
 
 public:
   Aerogel(double, double, double, double);
+    int calcNumPhotons(double);
+
   double getRefractiveIndex();
   double getThickness();
   double getDistance();
-  void applyPhotonScatter(Photon*);
+  void applyPhotonScatters(std::vector<Photon*>);
   std::vector<Photon*> generatePhotons(Particle*);
   double getDistInGel(Particle*);
 

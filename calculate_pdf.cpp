@@ -1,5 +1,6 @@
 #include "stdlib.h"
 #include <iostream>
+#include <chrono>
 #include "TMath.h"
 #include "TF1.h"
 #include "TH2D.h"
@@ -18,17 +19,26 @@
 #include "aerogel.h"
 #include "particle.h"
 #include "photon.h"
-#include <chrono>
+#include "detector.h"
 using namespace std;
 using namespace std::chrono;
 
 struct phStructruct {
-  double dirx;
-  double diry;
-  double dirz;
-  double posx;
-  double posy;
-  double posz;
+  // Initial direction and position
+  double dirxi;
+  double diryi;
+  double dirzi;
+  double posxi;
+  double posyi;
+  double poszi;
+  // Direction and position upon exit of aerogel
+  double dirxe;
+  double dirye;
+  double dirze;
+  double posxe;
+  double posye;
+  double posze; 
+  // Parent particle
   int paId;
 };
 
@@ -47,15 +57,17 @@ int main(int argc, char *argv[]) {
 
   // Beam parameters:
   double beta = 0.99; // velocity of particle
-  double n = 1.035; // index of refraction
+  double n1 = 1.035; // index of refraction
+  double n2 = 1.05; // index of refraction
+
   double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
   double dist = 21.0; // dist to detector plane
   double thickness = 2.0; // thickness of aerogel layer
-  double x_0 = -3.0; // beam initial position
-  double y_0 = -2.0;
+  double x_0 = -0.0; // beam initial position
+  double y_0 = -0.0;
   TVector3 pos_0 = TVector3(x_0, y_0, 0);
-  double dirX_0 = 0.1; // beam initial direction
-  double dirY_0 = -0.05;
+  double dirX_0 = 0.4; // beam initial direction
+  double dirY_0 = -0.00;
   double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 dir_0 = TVector3(dirX_0, dirY_0, dirZ_0);
   double errX = 0.0; // beam position error
@@ -69,13 +81,15 @@ int main(int argc, char *argv[]) {
   beam->makeParticles(nIter);
 
   // Make Aerogel layer
-  Aerogel* aerogel = new Aerogel(thickness, n, dist-aeroPos[0], beta);
+  Aerogel* aerogel1 = new Aerogel(thickness, n1, dist-aeroPos[0], beta);
+  Aerogel* aerogel2 = new Aerogel(thickness, n2, dist-aeroPos[1], beta);
 
   // Get plots ready
   TH2D *beamHist = beam->plotParticles(dist);
   TH2D *photonHist = new TH2D("photonHist","photonHist",200,-15,15,200,-15,15);
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
   TH1D *distHist = new TH1D("distHist", "distHist", 200, 0., 5.);
+  TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 200, 1.8, 2.1);
 
 
   // Make a tree to save the photons
@@ -84,7 +98,7 @@ int main(int argc, char *argv[]) {
   particleStruct paStruct;
   TFile *f = new TFile("./output/photons.root","RECREATE");
   TTree *tree = new TTree("T","Output photon data");
-  TBranch *phBranch = tree->Branch("photons",&phStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:parentid/i");
+  TBranch *phBranch = tree->Branch("photons",&phStruct.dirxe,"dirx/D:diry:dirz:posx:posy:posz:parentid/i");
   TBranch *paBranch = tree->Branch("particles",&paStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:id/i");
 
   for (int i = 0; i < nIter; i++) {
@@ -98,25 +112,30 @@ int main(int argc, char *argv[]) {
     paStruct.posz = pa->pos[2];
     paStruct.id = i;
     paBranch->Fill();
+    numPhotonHist->Fill(aerogel1->getDistInGel(pa));
 
-    std::vector<Photon*> photons = aerogel->generatePhotons(pa);
+    std::vector<Photon*> photons = aerogel1->generatePhotons(pa);
+    aerogel1->applyPhotonScatters(photons);
+
     for (int j = 0; j < photons.size(); j++) {
       Photon* ph = photons[j];
       TVector3 phPos = ph->pos;
       TVector3 phDir = ph->dir;
-      phStruct.dirx = phDir[0];
-      phStruct.diry = phDir[1];
-      phStruct.dirz = phDir[2];
-      phStruct.posx = phPos[0];
-      phStruct.posy = phPos[1];
-      phStruct.posz = phPos[2];
+      phStruct.dirxe = phDir[0];
+      phStruct.dirye = phDir[1];
+      phStruct.dirze = phDir[2];
+      phStruct.posxe = phPos[0];
+      phStruct.posye = phPos[1];
+      phStruct.posze = phPos[2];
       phStruct.paId = i;
       phBranch->Fill();
       double phDist = ph->dist(dist);
-      photonHist->Fill(phPos[0] + phDist*phDir[0]/phDir[2], phPos[1] + phDist*phDir[1]/phDir[2]);
+      photonHist->Fill(phPos[0] + phDist*phDir[0], phPos[1] + phDist*phDir[1]);
+
       scatterHist->Fill(ph->numScatters);
-      distHist->Fill(aerogel->getDistInGel(ph));
+      distHist->Fill(aerogel1->getDistInGel(ph));
     }
+
   }
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>( t2 - t1 ).count();
@@ -137,9 +156,13 @@ int main(int argc, char *argv[]) {
 
   TCanvas *c3 = new TCanvas("c3","c3",600,500);
   c3->cd();
-  //c2->SetLogy();
   distHist->Draw();
   c3->SaveAs("./output/distHist.pdf");
+
+  TCanvas *c4 = new TCanvas("c4","c4",600,500);
+  c4->cd();
+  numPhotonHist->Draw();
+  c4->SaveAs("./output/numPhotonHist.pdf");
 
   f->Write();
   tree->Print();

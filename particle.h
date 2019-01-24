@@ -6,6 +6,8 @@
 class Particle {
 public:
   Particle(TVector3, TVector3);
+  TVector3 pos0;
+  TVector3 dir0;
   TVector3 pos;
   TVector3 dir;
   double theta();

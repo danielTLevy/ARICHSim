@@ -84,12 +84,12 @@ double Aerogel::getDistance() {
 
 double Aerogel::getDistInGel(Particle* pa) {
   // calculate how far a particle has remaining in the gel
-  return abs((thickness - pa->pos[2]) / cos(pa->theta()));
+  return abs((thickness - pa->pos[2]) / pa->dir[2]);
 }
 
 int Aerogel::calcNumPhotons(double particleDist) {
   // N ~= dN/dX * X (in meters)
-  return particleDist*0.01*dNdX;
+  return (int) particleDist*0.01*dNdX;
 }
 
 double Aerogel::getIntLengthForWav(double wav) {
@@ -119,7 +119,7 @@ double Aerogel::getRandomScatAngle() {
 
 void Aerogel::applyPhotonScatter(Photon* photon) {
   // Continuously scatter photon while the distance travelled before interacting
-  // is less than the distance to exit the gel
+  // is less than the distance to exit the gel - update position and direction
   double intDist = getRandomIntDistance(photon->wav);
   double gelDist = getDistInGel(photon);
 
@@ -136,7 +136,16 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
     intDist = getRandomIntDistance(photon->wav);
     gelDist = getDistInGel(photon);
   }
+
+
 }
+
+void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
+  for(int i = 0; i < photons.size(); i++) {
+    applyPhotonScatter(photons[i]);
+  }
+}
+
 
 std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
   // Create Cherenkov photons as the particle passes through the gel
@@ -157,8 +166,6 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
     double wav = getRandomWav();
 
     Photon* photon = new Photon(phPos, dirCR, wav);
-
-    applyPhotonScatter(photon);
     photons.push_back(photon);
   }
 
