@@ -83,16 +83,17 @@ int main(int argc, char *argv[]) {
   Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
   Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
 
+  // Make the detector
+  Detector* detector = new Detector(dist);
   // Get plots ready
   TH2D *beamHist = beam->plotParticles(dist);
   TH2D *photonHist = new TH2D("photonHist","photonHist",200,-15,15,200,-15,15);
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
   TH1D *distHist = new TH1D("distHist", "distHist", 200, 0., 5.);
-  TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 200, 1.8, 2.1);
+  TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 200, 0, 100);
 
 
   // Make a tree to save the photons
-
   phStructruct phStruct;
   particleStruct paStruct;
   TFile *f = new TFile("./output/photons.root","RECREATE");
@@ -111,7 +112,7 @@ int main(int argc, char *argv[]) {
     paStruct.posz = pa->pos[2];
     paStruct.id = i;
     paBranch->Fill();
-    numPhotonHist->Fill(aerogel1->getDistInGel(pa));
+    numPhotonHist->Fill(aerogel1->calcNumPhotons(aerogel1->getDistInGel(pa)));
 
     // Make photons in first aerogel and scatter them
     std::vector<Photon*> photons1 = aerogel1->generatePhotons(pa);
@@ -140,13 +141,13 @@ int main(int argc, char *argv[]) {
       phStruct.posze = phPos[2];
       phStruct.paId = i;
       phBranch->Fill();
-      double phDist = ph->dist(dist);
-      photonHist->Fill(phPos[0] + phDist*phDir[0], phPos[1] + phDist*phDir[1]);
+      //double phDist = ph->dist(dist);
 
       scatterHist->Fill(ph->numScatters);
     }
-
+    detector->projectPhotons(photonHist, photons);
   }
+
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>( t2 - t1 ).count();
   cout << "Time taken: " << duration / 1000000. << endl;

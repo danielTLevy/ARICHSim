@@ -1,8 +1,11 @@
 #include "detector.h"
 
-Detector::Detector() {
+Detector::Detector(double zPos) {
+  this->zPos = zPos;
   this->quantumEff = createQEff();
-}
+  this->randomGenerate=std::make_shared<TRandom3>();
+  this->randomGenerate->SetSeed(0);
+};
 
 TGraph* Detector::createQEff() {
   TGraph *qe = new TGraph();
@@ -40,12 +43,24 @@ TGraph* Detector::createQEff() {
 }
 
 double Detector::evalQEff(double wav) {
+  wav = wav*1E9;
   if ((wav > 267.) && (wav < 687.)) {
-    return quantumEff->Eval(wav);
+    return quantumEff->Eval(wav) / 100.;
   } else {
     return 0.;
   }
 }
 
+void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons) {
+  for (int j = 0; j < photons.size(); j++) {
+    Photon* ph = photons[j];
+    double qEff = evalQEff(ph->wav);
+
+    if (randomGenerate->Uniform(0,1) < qEff) {
+      double phDist = ph->dist(zPos);
+      photonHist->Fill(ph->pos[0] + phDist*ph->dir[0], ph->pos[1] + phDist*ph->dir[1]);
+    }
+  }
+}
 
 

@@ -9,12 +9,16 @@
 
 class Detector {
 private:
+  double zPos;
   TGraph *quantumEff;
   static TGraph *createQEff();
+  std::shared_ptr<TRandom3> randomGenerate;
+
 
 public:
-  Detector();
+  Detector(double);
   double evalQEff(double);
+  void projectPhotons(TH2D*,  std::vector<Photon*> );
 };
 
 #endif
