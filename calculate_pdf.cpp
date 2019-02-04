@@ -17,6 +17,7 @@
 #include "TMatrixT.h"
 #include "TVector3.h"
 #include "TEllipse.h"
+#include "TCutG.h"
 #include "beam.h"
 #include "aerogel.h"
 #include "particle.h"
@@ -117,7 +118,6 @@ int main(int argc, char *argv[]) {
   // Make the detector
   Detector* detector = new Detector(dist);
   // Get plots ready
-  TH2D *beamHist = beam->plotParticles(dist);
   TH2D *photonHist = new TH2D("photonHist","photonHist",60,-15,15,60,-15,15);
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
   TH1D *distHist = new TH1D("distHist", "distHist", 200, 0., 5.);
@@ -218,31 +218,27 @@ int main(int argc, char *argv[]) {
   double ringY = newY_0 + deltaR*dirY_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
   // Rotate the ellipse by the particle's phi direction
   double dirPhiDeg = atan(dirY_0/dirX_0)*180./TMath::Pi();
-  // Create the ellipse
-  TEllipse *el = new TEllipse(ringX,ringY,radiusA,radiusB, 0, 360, dirPhiDeg);
-  // Create two more ellipses to encapsulate the photons
+  // Create two ellipses to encapsulate the photons
   double ringOuterA = radiusA+1.5;
   double ringOuterB = radiusB+1.5;
   TEllipse *elOuter = new TEllipse(ringX,ringY,ringOuterA,ringOuterB, 0, 360, dirPhiDeg);
   double ringInnerA = radiusA-1.5;
   double ringInnerB = radiusB-1.5;
   TEllipse *elInner = new TEllipse(ringX,ringY,ringInnerA,ringInnerB, 0, 360, dirPhiDeg);
+  TCutG *outerCut = createCutFromEllipse(elOuter);
+  TCutG *innerCut = createCutFromEllipse(elInner);
 
   TCanvas *c1 = new TCanvas("c1","c1",600,500);
   c1->cd();
-  //beamHist->Draw("colz");
   photonHist->Scale(1. / nIter);
-  photonHist->SaveAs("./output/photonHist.root");
   photonHist->Draw("samecolz");
-  el->SetLineWidth(1);
-  el->SetFillStyle(0);
-  el->Draw("same");
-  elOuter->SetLineWidth(1);
-  elOuter->SetFillStyle(0);
-  elOuter->Draw("same");
-  elInner->SetLineWidth(1);
-  elInner->SetFillStyle(0);
-  elInner->Draw("same");
+
+  outerCut->Draw("same");
+  innerCut->Draw("same");
+  double nPhotons = outerCut->IntegralHist(photonHist) - innerCut->IntegralHist(photonHist);
+  cout << "Integrated number of photons in ring: " << nPhotons << endl;
+
+  photonHist->SaveAs("./output/photonHist.root");
   c1->SaveAs("./output/photonHist.pdf");
 
 

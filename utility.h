@@ -1,8 +1,10 @@
 #ifndef UTILITY_INCLUDE
 #define UTILITY_INCLUDE
 
-#include "TVector2.h"
+#include "TVector3.h"
 #include "TMatrixD.h"
+#include "TCutG.h"
+#include "TEllipse.h"
 
 static TMatrixD makeRotationMatrix(TVector3 dir) {
   // Rotation matrix to rotate (x,y,z)=(0,0,1) onto dir
@@ -43,6 +45,26 @@ static TVector3 rotateVector(TMatrixD rot, double theta, double phi) {
   dir.SetZ(cos(theta));
   // photon direction rotated onto particle direction
   return rot*dir;
+}
+
+static TCutG *createCutFromEllipse(TEllipse *ellipse) {
+  int np = 200;
+  double angle,dx,dy;
+  double dphi = 2.*TMath::Pi()/np;
+  double x1 = ellipse->GetX1();
+  double y1 = ellipse->GetY1();
+  double r1 = ellipse->GetR1();
+  double r2 = ellipse->GetR2();
+  double ct   = TMath::Cos(TMath::Pi()*ellipse->GetTheta()/180);
+  double st   = TMath::Sin(TMath::Pi()*ellipse->GetTheta()/180);
+  TCutG *cut = new TCutG();
+  for (Int_t i=0;i<=np;i++) {
+     angle = Double_t(i)*dphi;
+     dx    = r1*TMath::Cos(angle);
+     dy    = r2*TMath::Sin(angle);
+     cut->SetPoint(i, x1 + dx*ct - dy*st, y1 + dx*st + dy*ct);
+   }
+  return cut;
 }
 
 #endif
