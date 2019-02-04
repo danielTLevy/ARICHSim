@@ -16,6 +16,7 @@
 #include "TMatrixD.h"
 #include "TMatrixT.h"
 #include "TVector3.h"
+#include "TEllipse.h"
 #include "beam.h"
 #include "aerogel.h"
 #include "particle.h"
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]) {
   double errX = 0.0; // beam position error
   double errY = 0.0;
 
-  if (argc >= 3) {
+  if (argc >= 2) {
     beta = atof(argv[1]);
   }
   if (argc >= 4) {
@@ -198,14 +199,52 @@ int main(int argc, char *argv[]) {
   auto duration = duration_cast<microseconds>( t2 - t1 ).count();
   cout << "Time taken: " << duration / 1000000. << endl;
 
-  gStyle->SetOptStat(0);
+  //gStyle->SetOptStat(0);
+  // Define Ellipse and integrate over this ring
+  // Naively assume that all photons are generated in middle of second aerogel layer.
+  double middlePoint = thickness + thickness / 2.;
+  double newX_0 = x_0 + middlePoint*dirX_0/dirZ_0;
+  double newY_0 = y_0 + middlePoint*dirY_0/dirZ_0;
+  double newDist = dist - middlePoint;
+  double dirTheta =  atan(sqrt(dirX_0*dirX_0 +dirY_0*dirY_0) / dirZ_0);
+  double chAngle = aerogel2->getChAngle();
+  // Calculate ellipse parameters
+  double radiusA = 0.5*newDist*TMath::Abs(tan(dirTheta+chAngle) - tan(dirTheta-chAngle));
+  double radiusB = 0.5*newDist*TMath::Abs(tan(chAngle) - tan(-chAngle));
+  // Distance travelled on detector plane with respect to travel direction
+  double deltaR = newDist*tan(dirTheta-chAngle) + radiusA;
+  // Multiply by X and Y components of direction to get final x and y position
+  double ringX = newX_0 + deltaR*dirX_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
+  double ringY = newY_0 + deltaR*dirY_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
+  // Rotate the ellipse by the particle's phi direction
+  double dirPhiDeg = atan(dirY_0/dirX_0)*180./TMath::Pi();
+  // Create the ellipse
+  TEllipse *el = new TEllipse(ringX,ringY,radiusA,radiusB, 0, 360, dirPhiDeg);
+  // Create two more ellipses to encapsulate the photons
+  double ringOuterA = radiusA+1.5;
+  double ringOuterB = radiusB+1.5;
+  TEllipse *elOuter = new TEllipse(ringX,ringY,ringOuterA,ringOuterB, 0, 360, dirPhiDeg);
+  double ringInnerA = radiusA-1.5;
+  double ringInnerB = radiusB-1.5;
+  TEllipse *elInner = new TEllipse(ringX,ringY,ringInnerA,ringInnerB, 0, 360, dirPhiDeg);
 
   TCanvas *c1 = new TCanvas("c1","c1",600,500);
   c1->cd();
   //beamHist->Draw("colz");
   photonHist->Scale(1. / nIter);
+  photonHist->SaveAs("./output/photonHist.root");
   photonHist->Draw("samecolz");
-  c1->SaveAs("./output/beamAndPhotonScatter.pdf");
+  el->SetLineWidth(1);
+  el->SetFillStyle(0);
+  el->Draw("same");
+  elOuter->SetLineWidth(1);
+  elOuter->SetFillStyle(0);
+  elOuter->Draw("same");
+  elInner->SetLineWidth(1);
+  elInner->SetFillStyle(0);
+  elInner->Draw("same");
+  c1->SaveAs("./output/photonHist.pdf");
+
 
   TCanvas *c2 = new TCanvas("c2","c2",600,500);
   c2->cd();

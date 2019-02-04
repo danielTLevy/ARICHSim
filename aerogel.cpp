@@ -13,6 +13,9 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double b
   this->interactionLengths = readInteractionLength(refractiveIndex);
 }
 
+double Aerogel::getChAngle() {
+  return this->chAngle;
+}
 
 double Aerogel::calcChAngle(double n, double beta) {
   return acos(1.0 / (n * beta));

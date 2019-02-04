@@ -41,6 +41,7 @@ public:
   Aerogel(double, double, double, double);
     int calcNumPhotons(double);
 
+  double getChAngle();
   double getRefractiveIndex();
   double getThickness();
   double getZPos();
