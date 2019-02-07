@@ -214,10 +214,22 @@ int main(int argc, char *argv[]) {
   // Distance travelled on detector plane with respect to travel direction
   double deltaR = newDist*tan(dirTheta-chAngle) + radiusA;
   // Multiply by X and Y components of direction to get final x and y position
-  double ringX = newX_0 + deltaR*dirX_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
-  double ringY = newY_0 + deltaR*dirY_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
+  double ringX, ringY;
+  if (dirX_0 != 0 || dirY_0 != 0) {
+    ringX = newX_0 + deltaR*dirX_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
+    ringY = newY_0 + deltaR*dirY_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
+  } else {
+    ringX = newX_0;
+    ringY = newY_0;
+  }
+
   // Rotate the ellipse by the particle's phi direction
-  double dirPhiDeg = atan(dirY_0/dirX_0)*180./TMath::Pi();
+  double dirPhiDeg;
+  if (dirX_0 != 0) {
+    dirPhiDeg = atan(dirY_0/dirX_0)*180./TMath::Pi();
+  } else {
+    dirPhiDeg = 0.;
+  }
   // Create two ellipses to encapsulate the photons
   double ringOuterA = radiusA+1.5;
   double ringOuterB = radiusB+1.5;
