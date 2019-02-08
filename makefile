@@ -1,30 +1,29 @@
-# Declare
-#
-# C FLAGS
+INCDIR= $(shell pwd)/inc
+SRCDIR= $(shell pwd)/src
+OBJDIR= $(shell pwd)/obj
+BINDIR= $(shell pwd)/bin
+
+VPATH = $(SRCDIR)
+
+# FLAGS
 CC := g++
-CC_FLAGS =-std=c++11 -O2 -ffloat-store -w #-ansi -g 
-#INC := -I/Users/Daniel/Documents/courses/phys449/boost/boost_1_67_0/
-#LIB := -L. -lMinuit -L/Users/Daniel/Documents/courses/phys449/boost/boost_1_67_0/libs/iostreams
-#ROOT FLAGS
-R_LDFLAGS :=     `root-config --ldflags`
-R_LIBS    :=     `root-config --glibs`
-R_CFLAGS  :=     `root-config --cflags`
-R_ALL     :=     $(R_LADFLAGS) $(R_LIBS) $(R_CFLAGS)
+CFLAGS=-c -g -Wall `root-config --cflags` -I${INCDIR}
+LDFLAGS=`root-config --glibs` -lHistPainter
 
 # File names
-EXEC = run
-SOURCES = $(wildcard *.cpp)
-OBJECTS = $(SOURCES:.cpp=.o)
+EXEC = $(BINDIR)/final.out
+FILES= $(wildcard $(SRCDIR)/*.cpp)
+SOURCES=$(FILES)
 
-$(EXEC): $(OJECTS)
-	$(CC)  $(CC_FLAGS) -fPIC $(R_LDFLAGS) $(R_ALL) $(B_FLAGS)  -c $(SOURCES)
-	$(CC)  $(CC_FLAG) $(CC_FLAGS) $(R_ALL) $(G_FLAGS) $(B_FLAGS) $(OBJECTS) -o final.out
+OBJECTS = $(FILES:$(SRCDIR)/%.cpp=${OBJDIR}/%.o)
+print-%  : ; @echo $* = $($*)
+
+$(OBJDIR)/%.o: %.cpp
+	$(CC) $(CFLAGS) $< -o $@
+$(EXEC): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
 
 # To remove generated files
 clean:
-	rm *.o
+	rm $(BINDIR)/* $(OBJDIR)/*.o
 
-lib:
-	make clean
-	make
-	"g++" -fPIC $(CC_FLAGS)$ $(R_ALL) $(LIB) $(INC)  $(OBJECTS) -shared -o libPID.so
