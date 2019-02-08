@@ -9,8 +9,8 @@ thicknesses = [2.04, 1.99, 2.00, 1.93,2.00]
 for i, file in enumerate(files):
     thickness = thicknesses[i]
     n = ns[i]
-    wavs = []
-    trans = []
+    wavs = [] # Wavelengths
+    trans = [] # Transmission percentages
     with open(file) as f:
         for line in f:
             wavs.append(float(line.split()[0]))
@@ -20,9 +20,8 @@ for i, file in enumerate(files):
     trans = trans / 100. 
     # Prevent any funny log business
     trans[trans <= 0] = 0.0001
-    # Calculate interaciton length
-    intlengths = -thickness*np.log(trans)
+    # Calculate interactions length, given trans = exp(-thickness/intLength)
+    intlengths = -thickness/np.log(trans)
     output = np.column_stack((wavs, intlengths))  
     newFile = file.split('.')[0] + "IntLength.csv"  
     np.savetxt(newFile, output)
-
