@@ -5,6 +5,7 @@ Detector::Detector(double zPos) {
   this->quantumEff = createQEff();
   this->randomGenerate=std::make_shared<TRandom3>();
   this->randomGenerate->SetSeed(0);
+  this->fillFactor = 0.8*0.87;
 };
 
 TGraph* Detector::createQEff() {
@@ -40,6 +41,10 @@ TGraph* Detector::createQEff() {
   qe->SetPoint(28,675.5028305794633, 0.03476537833796253);
   qe->SetPoint(29,686.4857090256363, 0.01427881998143405);
   return qe;
+}
+
+double Detector::getFillFactor() {
+  return fillFactor;
 }
 
 double Detector::evalQEff(double wav) {

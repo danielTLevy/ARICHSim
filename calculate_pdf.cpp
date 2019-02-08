@@ -26,7 +26,7 @@
 using namespace std;
 using namespace std::chrono;
 
-struct phStructruct {
+struct photonStruct {
   // Initial direction and position
   double dirxi;
   double diryi;
@@ -71,8 +71,8 @@ int main(int argc, char *argv[]) {
   double dirY_0 = -0.00;
   double x_0 = -0.0; // beam initial position
   double y_0 = -0.0;
-  double errDirX = 0.01; // beam direction error
-  double errDirY = 0.01;
+  double errDirX = 0.001; // beam direction error
+  double errDirY = 0.001;
   double errX = 0.0; // beam position error
   double errY = 0.0;
 
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
   // Make the detector
   Detector* detector = new Detector(dist);
   // Get plots ready
-  TH2D *photonHist = new TH2D("photonHist","photonHist",60,-15,15,60,-15,15);
+  TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
   TH1D *distHist = new TH1D("distHist", "distHist", 200, 0., 5.);
   TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 400, 0, 400);
@@ -127,11 +127,11 @@ int main(int argc, char *argv[]) {
 
 
   // Make a tree to save the photons
-  phStructruct phStruct;
+  photonStruct phStruct;
   particleStruct paStruct;
   TFile *f = new TFile("./output/photons.root","RECREATE");
   TTree *tree = new TTree("T","Output photon data");
-  TBranch *phBranch = tree->Branch("photons",&phStruct.dirxi,"dirx/D:diry:dirz:posx:posy:posz:parentid/i");
+  TBranch *phBranch = tree->Branch("photons",&phStruct.dirxi,"dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:paId/i");
   TBranch *paBranch = tree->Branch("particles",&paStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:id/i");
 
   for (int i = 0; i < nIter; i++) {
@@ -195,6 +195,12 @@ int main(int argc, char *argv[]) {
     detector->projectPhotons(photonHist, photons);
   }
 
+  // Scale photon histogram to the number of iterations
+  photonHist->Scale(1. / nIter);
+  // Scale photon to fill factor of detector
+  photonHist->Scale(detector->getFillFactor());
+
+
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>( t2 - t1 ).count();
   cout << "Time taken: " << duration / 1000000. << endl;
@@ -222,7 +228,6 @@ int main(int argc, char *argv[]) {
     ringX = newX_0;
     ringY = newY_0;
   }
-
   // Rotate the ellipse by the particle's phi direction
   double dirPhiDeg;
   if (dirX_0 != 0) {
@@ -240,20 +245,18 @@ int main(int argc, char *argv[]) {
   TCutG *outerCut = createCutFromEllipse(elOuter);
   TCutG *innerCut = createCutFromEllipse(elInner);
 
+  // Draw out photon histogram and ellipse outline
   TCanvas *c1 = new TCanvas("c1","c1",600,500);
   c1->cd();
-  photonHist->Scale(1. / nIter);
   photonHist->Draw("samecolz");
-
   outerCut->Draw("same");
   innerCut->Draw("same");
   double nPhotons = outerCut->IntegralHist(photonHist) - innerCut->IntegralHist(photonHist);
   cout << "Integrated number of photons in ring: " << nPhotons << endl;
-
   photonHist->SaveAs("./output/photonHist.root");
   c1->SaveAs("./output/photonHist.pdf");
 
-
+  // Count number of scatters
   TCanvas *c2 = new TCanvas("c2","c2",600,500);
   c2->cd();
   c2->SetLogy();

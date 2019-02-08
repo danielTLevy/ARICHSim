@@ -11,13 +11,14 @@ class Detector {
 private:
   double zPos;
   TGraph *quantumEff;
+  double fillFactor;
   static TGraph *createQEff();
   std::shared_ptr<TRandom3> randomGenerate;
-
 
 public:
   Detector(double);
   double evalQEff(double);
+  double getFillFactor();
   void projectPhotons(TH2D*,  std::vector<Photon*> );
 };
 
