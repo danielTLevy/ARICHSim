@@ -23,43 +23,9 @@
 #include "particle.h"
 #include "photon.h"
 #include "detector.h"
-#include "generateEvent.h"
 using namespace std;
-using namespace std::chrono;
 
-struct photonStruct {
-  // Initial direction and position
-  double dirxi;
-  double diryi;
-  double dirzi;
-  double posxi;
-  double posyi;
-  double poszi;
-  // Direction and position upon exit of aerogel
-  double dirxe;
-  double dirye;
-  double dirze;
-  double posxe;
-  double posye;
-  double posze; 
-  // Parent particle
-  int paId;
-};
-
-struct particleStruct {
-  double dirx;
-  double diry;
-  double dirz;
-  double posx;
-  double posy;
-  double posz;
-  int id;
-};
-
-int main(int argc, char *argv[]) {
-  generateEvent(argc, argv);
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  int nIter = 10000; // number of particles simulated for beam
+int generateEvent(int argc, char *argv[]) {
   double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
   double thickness = 2.0; // thickness of aerogel layer
   double n1 = 1.035; // outer index of refraction
@@ -111,7 +77,7 @@ int main(int argc, char *argv[]) {
 
   // Generate beam
   Beam *beam = new Beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
-  beam->makeParticles(nIter);
+  Particle *pa = beam->generateParticle();
 
   // Make Aerogel layer
   Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
@@ -119,88 +85,30 @@ int main(int argc, char *argv[]) {
 
   // Make the detector
   Detector* detector = new Detector(dist);
-  // Get plots ready
+
+  // Make photons in first aerogel and scatter them
+  std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
+  aerogel1->applyPhotonScatters(photons);
+  // Advance particle forward to next aerogel and generate photons
+  pa->travelZDist(aeroPos[1] - aeroPos[0]);
+  std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
+
+  // Combine photons from both aerogels
+  photons.insert(photons.end(), photons2.begin(), photons2.end());
+
+  // Include scattering in second aerogel
+  aerogel2->applyPhotonScatters(photons);
+
+  // Throw out photons based off fill factor
+
+  int numPhotonsDetected = (int) (detector->getFillFactor() * photons.size());
+  photons.resize(numPhotonsDetected); 
+
+  // Project photons onto detector and plot distribution
+  // Get plot ready
   TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
-  TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
-  TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 400, 0, 400);
-  TH1D *wavHist = new TH1D("wavHist", "wavHist", 200, 250E-9, 700E-9);
+  detector->projectPhotons(photonHist, photons);
 
-  // Make a tree to save the photons
-  photonStruct phStruct;
-  particleStruct paStruct;
-  TFile *f = new TFile("./output/photons.root","RECREATE");
-  TTree *tree = new TTree("T","Output photon data");
-  TBranch *phBranch = tree->Branch("photons",&phStruct.dirxi,
-    "dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:paId/i");
-  TBranch *paBranch = tree->Branch("particles",&paStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:id/i");
-
-  for (int i = 0; i < nIter; i++) {
-    // Generate particles
-    Particle *pa = beam->getParticle(i);
-    paStruct.dirx = pa->dir0[0];
-    paStruct.diry = pa->dir0[1];
-    paStruct.dirz = pa->dir0[2];
-    paStruct.posx = pa->pos0[0];
-    paStruct.posy = pa->pos0[1];
-    paStruct.posz = pa->pos0[2];
-    paStruct.id = i;
-    paBranch->Fill();
-
-    // Make photons in first aerogel and scatter them
-    std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
-    aerogel1->applyPhotonScatters(photons);
-    // Advance particle forward to next aerogel and generate photons
-    pa->travelZDist(aeroPos[1] - aeroPos[0]);
-    std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
-
-    // Combine photons from both aerogels
-    photons.insert(photons.end(), photons2.begin(), photons2.end());
-
-    // Include scattering in second aerogel
-    aerogel2->applyPhotonScatters(photons);
-
-    for (int j = 0; j < photons.size(); j++) {
-      Photon* ph = photons[j];
-      // Save parent particle ID
-      phStruct.paId = i;
-      // Save initial direction and positions
-      TVector3 phPos0 = ph->pos0;
-      TVector3 phDir0 = ph->dir0;
-      phStruct.dirxi = phDir0[0];
-      phStruct.diryi = phDir0[1];
-      phStruct.dirzi = phDir0[2];
-      phStruct.posxi = phPos0[0];
-      phStruct.posyi = phPos0[1];
-      phStruct.poszi = phPos0[2];
-      // Save exit direction and positions
-      TVector3 phPos = ph->pos;
-      TVector3 phDir = ph->dir;
-      phStruct.dirxe = phDir[0];
-      phStruct.dirye = phDir[1];
-      phStruct.dirze = phDir[2];
-      phStruct.posxe = phPos[0];
-      phStruct.posye = phPos[1];
-      phStruct.posze = phPos[2];
-
-      phBranch->Fill();
-      scatterHist->Fill(ph->numScatters);
-      wavHist->Fill(ph->getWavelength());
-    }
-    numPhotonHist->Fill(photons.size());
-
-    // Project photons onto detector and plot distribution
-    detector->projectPhotons(photonHist, photons);
-  }
-
-  // Scale photon histogram to the number of iterations
-  photonHist->Scale(1. / nIter);
-  // Scale photon to fill factor of detector
-  photonHist->Scale(detector->getFillFactor());
-
-
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  auto duration = duration_cast<microseconds>( t2 - t1 ).count();
-  cout << "Time taken: " << duration / 1000000. << endl;
 
   //gStyle->SetOptStat(0);
   // Define Ellipse and integrate over this ring
@@ -250,27 +158,9 @@ int main(int argc, char *argv[]) {
   innerCut->Draw("same");
   double nPhotons = outerCut->IntegralHist(photonHist) - innerCut->IntegralHist(photonHist);
   cout << "Integrated number of photons in ring: " << nPhotons << endl;
-  photonHist->SaveAs("./output/photonHist.root");
-  c1->SaveAs("./output/photonHist.pdf");
-
-  // Count number of scatters
-  TCanvas *c2 = new TCanvas("c2","c2",600,500);
-  c2->cd();
-  c2->SetLogy();
-  scatterHist->Draw();
-  c2->SaveAs("./output/scatterCount.pdf");
+  photonHist->SaveAs("./output/generatedEvent.root");
+  c1->SaveAs("./output/generatedEvent.pdf");
 
 
-  TCanvas *c3 = new TCanvas("c3","c3",600,500);
-  c3->cd();
-  wavHist->Draw();
-  c3->SaveAs("./output/wavHist.pdf");
-
-  TCanvas *c4 = new TCanvas("c4","c4",600,500);
-  c4->cd();
-  numPhotonHist->Draw();
-  c4->SaveAs("./output/numPhotonHist.pdf");
-
-  f->Write();
   return 0;
 };
