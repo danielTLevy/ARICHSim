@@ -1,6 +1,6 @@
 #include "aerogel.h"
 
-const double lowWav = 275E-9;
+const double lowWav = 290E-9;
 const double highWav = 700E-9;
 const double fineStructConst = 1./137;
 Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double beta) {
@@ -106,11 +106,11 @@ double Aerogel::getIntLengthForWav(double wav) {
 
 double Aerogel::getRandomIntDistance(double wav) {
   double intLength = getIntLengthForWav(wav);
-  // Our CDF is exp(-intLength / x)
+  // Our CDF of whether photon has interacted is 1 - exp(- x / interactionL)
   // Sample randomly for value of CDF
   // Invert the equation to get the x value that would get this random value
   double randY = randomGenerate->Uniform(0,1);
-  return - intLength / log(randY);
+  return - intLength * log(1. - randY);
 
 }
 

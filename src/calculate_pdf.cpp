@@ -57,7 +57,7 @@ struct particleStruct {
 };
 
 int main(int argc, char *argv[]) {
-  generateEvent(argc, argv);
+  //generateEvent(argc, argv);
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
   int nIter = 10000; // number of particles simulated for beam
   double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
@@ -149,6 +149,7 @@ int main(int argc, char *argv[]) {
     // Make photons in first aerogel and scatter them
     std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
     aerogel1->applyPhotonScatters(photons);
+
     // Advance particle forward to next aerogel and generate photons
     pa->travelZDist(aeroPos[1] - aeroPos[0]);
     std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
