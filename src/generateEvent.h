@@ -106,7 +106,7 @@ int generateEvent(int argc, char *argv[]) {
 
   // Project photons onto detector and plot distribution
   // Get plot ready
-  TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
+  TH2D *photonHist = new TH2D("generatedEvent","generatedEvent",48,-15,15,48,-15,15);
   detector->projectPhotons(photonHist, photons);
 
 
