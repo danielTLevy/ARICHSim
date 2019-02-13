@@ -1,5 +1,8 @@
 #include "aerogel.h"
 
+const double lowWav = 275E-9;
+const double highWav = 700E-9;
+const double fineStructConst = 1./137;
 Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double beta) {
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
@@ -22,18 +25,14 @@ double Aerogel::calcChAngle(double n, double beta) {
 }
 
 TF1* Aerogel::calcWavPdf(double n, double beta) {
-  TF1 *pdf = new TF1("pdf", "(1. - 1./([0]*[1]*[0]*[1]))/(x*x)",
-                      300E-9, 700E-9);
+  TF1 *pdf = new TF1("pdf", "(1. - 1./([0]*[1]*[0]*[1]))/(x*x)", lowWav, highWav);
   pdf->SetParameter(0, n); pdf->SetParName(0, "n");
   pdf->SetParameter(1, beta); pdf->SetParName(1, "beta");
   return pdf;
 }
 
 double Aerogel::calcdNdX(double n, double beta) {
-  double alpha = 1./137;
-  double lowWav = 300E-9;
-  double highWav = 700E-9; // TODO: make these constants!
-  return 2*TMath::Pi()*alpha*(1. - 1./(n*beta*n*beta))*(1./lowWav - 1./highWav);
+  return 2*TMath::Pi()*fineStructConst*(1. - 1./(n*beta*n*beta))*(1./lowWav - 1./highWav);
 }
 
 std::vector<double> Aerogel::readInteractionLength(double n) {
