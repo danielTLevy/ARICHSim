@@ -71,8 +71,8 @@ int main(int argc, char *argv[]) {
   double dirY_0 = -0.00;
   double x_0 = -0.0; // beam initial position
   double y_0 = -0.0;
-  double errDirX = 0.001; // beam direction error
-  double errDirY = 0.001;
+  double errDirX = 0.0001; // beam direction error
+  double errDirY = 0.0001;
   double errX = 0.0; // beam position error
   double errY = 0.0;
 
@@ -120,18 +120,16 @@ int main(int argc, char *argv[]) {
   // Get plots ready
   TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
-  TH1D *distHist = new TH1D("distHist", "distHist", 200, 0., 5.);
   TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 400, 0, 400);
-  TH1D *wavHist = new TH1D("wavHist", "wavHist", 200, 300E-9, 700E-9);
-
-
+  TH1D *wavHist = new TH1D("wavHist", "wavHist", 200, 250E-9, 700E-9);
 
   // Make a tree to save the photons
   photonStruct phStruct;
   particleStruct paStruct;
   TFile *f = new TFile("./output/photons.root","RECREATE");
   TTree *tree = new TTree("T","Output photon data");
-  TBranch *phBranch = tree->Branch("photons",&phStruct.dirxi,"dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:paId/i");
+  TBranch *phBranch = tree->Branch("photons",&phStruct.dirxi,
+    "dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:paId/i");
   TBranch *paBranch = tree->Branch("particles",&paStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:id/i");
 
   for (int i = 0; i < nIter; i++) {
@@ -147,11 +145,11 @@ int main(int argc, char *argv[]) {
     paBranch->Fill();
 
     // Make photons in first aerogel and scatter them
-    std::vector<Photon*> photons1 = aerogel1->generatePhotons(pa);
+    std::vector<Photon*> photons1 = aerogel1->generatePhotons(pa, detector);
     aerogel1->applyPhotonScatters(photons1);
     // Advance particle forward to next aerogel and generate photons
     pa->travelZDist(aeroPos[1] - aeroPos[0]);
-    std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa);
+    std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
 
     // Combine photons from both aerogels
     std::vector<Photon*> photons;

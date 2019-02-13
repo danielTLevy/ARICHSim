@@ -139,8 +139,6 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
     intDist = getRandomIntDistance(photon->wav);
     gelDist = getDistInGel(photon);
   }
-
-
 }
 
 void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
@@ -150,8 +148,9 @@ void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
 }
 
 
-std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
+std::vector<Photon*> Aerogel::generatePhotons(Particle* pa, Detector* detector) {
   // Create Cherenkov photons as the particle passes through the gel
+  // Hacky, but requires detector
   TMatrixD rotMatrix = makeRotationMatrix(pa->dir);
   double paDist = getDistInGel(pa);
 
@@ -159,19 +158,23 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa) {
   int nPhotons = calcNumPhotons(paDist);
   photons.reserve(nPhotons);
   for (int i = 0; i < nPhotons; i++) {
-    // Get the point where the photon was emitted
-    double phIntDist = randomGenerate->Uniform(paDist);
-    TVector3 phPos = pa->pos + phIntDist*pa->dir;
-    // Get the direection of the new photon
-    double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-    TVector3 dirCR = rotateVector(rotMatrix, chAngle, phPhi);
-    // Get the wavelength of the photon
+    // First decide if we want to throw it out yet, based of quantum efficiency
+    // Can do this now because the photon's wavelength won't change
     double wav = getRandomWav();
+    if (randomGenerate->Uniform(0,1) > detector->evalQEff(wav)) {
+      continue;
+    } else {
+      // Get the point where the photon was emitted
+      double phIntDist = randomGenerate->Uniform(paDist);
+      TVector3 phPos = pa->pos + phIntDist*pa->dir;
+      // Get the direection of the new photon
+      double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
+      TVector3 dirCR = rotateVector(rotMatrix, chAngle, phPhi);
+      // Get the wavelength of the photon
 
-    Photon* photon = new Photon(phPos, dirCR, wav);
-    photons.push_back(photon);
+      Photon* photon = new Photon(phPos, dirCR, wav);
+      photons.push_back(photon);
+    }
   }
-
   return photons;
-
 }

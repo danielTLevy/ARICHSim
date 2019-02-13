@@ -11,6 +11,7 @@
 #include "beam.h"
 #include "photon.h"
 #include "particle.h"
+#include "detector.h"
 #include "utility.h"
 
 class Aerogel {
@@ -39,14 +40,14 @@ private:
 
 public:
   Aerogel(double, double, double, double);
-    int calcNumPhotons(double);
+  int calcNumPhotons(double);
 
   double getChAngle();
   double getRefractiveIndex();
   double getThickness();
   double getZPos();
   void applyPhotonScatters(std::vector<Photon*>);
-  std::vector<Photon*> generatePhotons(Particle*);
+  std::vector<Photon*> generatePhotons(Particle*, Detector*);
   double getDistInGel(Particle*);
 
 };

@@ -16,7 +16,6 @@ static TMatrixD makeRotationMatrix(TVector3 dir) {
   // b = (dirx, diry, dirz)
   // v = a x b = (-diry, dirx, 0)
   TVector3 v(-dir.Y(), dir.X(), 0);
-  double s = v.Mag(); // sin(a,b) = ||v|| 
   double c = dir.Z(); // cos(a,b) = a . b = (0,0,1) . (dirx, diry, dirz) = dirz
 
   // rot =   I   + v    + v^2                    * (1-c)/s^2

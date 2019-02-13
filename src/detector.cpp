@@ -49,7 +49,7 @@ double Detector::getFillFactor() {
 
 double Detector::evalQEff(double wav) {
   wav = wav*1E9;
-  if ((wav > 267.) && (wav < 687.)) {
+  if ((wav >= 267.) && (wav <= 687.)) {
     return quantumEff->Eval(wav) / 100.;
   } else {
     return 0.;
@@ -59,12 +59,8 @@ double Detector::evalQEff(double wav) {
 void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons) {
   for (int j = 0; j < photons.size(); j++) {
     Photon* ph = photons[j];
-    double qEff = evalQEff(ph->wav);
-
-    if (randomGenerate->Uniform(0,1) < qEff) {
-      double phDist = ph->dist(zPos);
-      photonHist->Fill(ph->pos[0] + phDist*ph->dir[0], ph->pos[1] + phDist*ph->dir[1]);
-    }
+    double phDist = ph->dist(zPos);
+    photonHist->Fill(ph->pos[0] + phDist*ph->dir[0], ph->pos[1] + phDist*ph->dir[1]);
   }
 }
 
