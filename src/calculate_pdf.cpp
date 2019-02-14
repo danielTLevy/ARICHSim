@@ -68,8 +68,6 @@ struct particleStruct {
 
 double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TCanvas* canvas, Aerogel* aerogel) {
   // Define Ellipse and integrate over this ring
-
-
   double dirX_0 = dir0[0];
   double dirY_0 = dir0[1];
   double dirZ_0 = dir0[2];
