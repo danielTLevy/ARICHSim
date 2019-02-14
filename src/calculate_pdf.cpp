@@ -23,7 +23,6 @@
 #include "particle.h"
 #include "photon.h"
 #include "detector.h"
-#include "generateEvent.h"
 using namespace std;
 using namespace std::chrono;
 
@@ -67,43 +66,111 @@ struct particleStruct {
   int id;
 };
 
-int main(int argc, char *argv[]) {
-  //generateEvent(argc, argv);
+double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TCanvas* canvas, Aerogel* aerogel) {
+  // Define Ellipse and integrate over this ring
+
+
+  double dirX_0 = dir0[0];
+  double dirY_0 = dir0[1];
+  double dirZ_0 = dir0[2];
+
+  // Naively assume that all photons are generated in middle of second aerogel layer.
+  double middlePoint = thickness + thickness / 2.;
+  double newX_0 = pos0[0] + middlePoint*dirX_0/dirZ_0;
+  double newY_0 = pos0[1] + middlePoint*dirY_0/dirZ_0;
+  double newDist = dist - middlePoint;
+  double dirTheta =  atan(sqrt(dirX_0*dirX_0 +dirY_0*dirY_0) / dirZ_0);
+  double chAngle = aerogel->getChAngle();
+  // Calculate ellipse parameters
+  double radiusA = 0.5*newDist*TMath::Abs(tan(dirTheta+chAngle) - tan(dirTheta-chAngle));
+  double radiusB = 0.5*newDist*TMath::Abs(tan(chAngle) - tan(-chAngle));
+  // Distance travelled on detector plane with respect to travel direction
+  double deltaR = newDist*tan(dirTheta-chAngle) + radiusA;
+  // Multiply by X and Y components of direction to get final x and y position
+  double ringX, ringY;
+  if (dirX_0 != 0 || dirY_0 != 0) {
+    ringX = newX_0 + deltaR*dirX_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
+    ringY = newY_0 + deltaR*dirY_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
+  } else {
+    ringX = newX_0;
+    ringY = newY_0;
+  }
+  // Rotate the ellipse by the particle's phi direction
+  double dirPhiDeg;
+  if (dirX_0 != 0) {
+    dirPhiDeg = atan(dirY_0/dirX_0)*180./TMath::Pi();
+  } else {
+    dirPhiDeg = 0.;
+  }
+  // Create two ellipses to encapsulate the photons
+  double ringOuterA = radiusA+1.5;
+  double ringOuterB = radiusB+1.5;
+  TEllipse *elOuter = new TEllipse(ringX,ringY,ringOuterA,ringOuterB, 0, 360, dirPhiDeg);
+  double ringInnerA = radiusA-1.5;
+  double ringInnerB = radiusB-1.5;
+  TEllipse *elInner = new TEllipse(ringX,ringY,ringInnerA,ringInnerB, 0, 360, dirPhiDeg);
+  TCutG *outerCut = createCutFromEllipse(elOuter);
+  TCutG *innerCut = createCutFromEllipse(elInner);
+
+  canvas->cd();
+  outerCut->Draw("same");
+  innerCut->Draw("same");
+
+  return outerCut->IntegralHist(photonHist) - innerCut->IntegralHist(photonHist);
+}
+
+
+TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
+  // Generate a single particle event
+  Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
+  Particle *pa = beam->generateParticle();
+
+  // Make Aerogel layer
+  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
+  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
+
+  // Make the detector
+  Detector* detector = new Detector(dist);
+
+  // Make photons in first aerogel and scatter them
+  std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
+  aerogel1->applyPhotonScatters(photons);
+  // Advance particle forward to next aerogel and generate photons
+  pa->travelZDist(aeroPos[1] - aeroPos[0]);
+  std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
+
+  // Combine photons from both aerogels
+  photons.insert(photons.end(), photons2.begin(), photons2.end());
+
+  // Include scattering in second aerogel
+  aerogel2->applyPhotonScatters(photons);
+
+  // Throw out photons based off fill factor
+  int numPhotonsDetected = (int) (detector->getFillFactor() * photons.size());
+  photons.resize(numPhotonsDetected);
+
+  // Project photons onto detector and plot distribution
+  TH2D *photonHist = new TH2D("generatedEvent","generatedEvent",48,-15,15,48,-15,15);
+  detector->projectPhotons(photonHist, photons);
+
+  // Draw out photon histogram and ellipse outline
+  TCanvas *c1 = new TCanvas("c1","c1",600,500);
+  c1->cd();
+  photonHist->Draw("samecolz");
+
+  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
+  cout << "SINGLE EXAMPLE EVENT: Integrated number of photons in ring: " << nPhotons << endl;
+  photonHist->SaveAs("./output/generatedEvent.root");
+  c1->SaveAs("./output/generatedEvent.pdf");
+
+  return photonHist;
+}
+
+TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-
-  // Beam parameters:
-  double beta = 0.999; // velocity of particle
-
-  double dirX_0 = 0.2; // beam initial direction
-  double dirY_0 = -0.00;
-  double x_0 = -0.0; // beam initial position
-  double y_0 = -0.0;
-
-
-  if (argc >= 2) {
-    beta = atof(argv[1]);
-  }
-  if (argc >= 4) {
-    dirX_0 = atof(argv[2]);
-    dirY_0 = atof(argv[3]);
-  }
-  if (argc >= 6) {
-    x_0 = atof(argv[4]);
-    y_0 = atof(argv[5]);
-  }
-
-  cout << "Beta: " << beta << endl;
-  cout << "X Dir: " << dirX_0 << endl;
-  cout << "Y Dir: " << dirY_0 << endl;
-  cout << "X Pos: " << x_0 << endl;
-  cout << "Y Pos: " << y_0 << endl;
-  double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
-  TVector3 pos_0 = TVector3(x_0, y_0, 0);
-  TVector3 dir_0 = TVector3(dirX_0, dirY_0, dirZ_0);
-
   // Generate beam
-  Beam *beam = new Beam(pos_0, dir_0, beta, errX, errY, errDirX, errDirY);
+  Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   beam->makeParticles(nIter);
 
   // Make Aerogel layer
@@ -196,54 +263,15 @@ int main(int argc, char *argv[]) {
   auto duration = duration_cast<microseconds>( t2 - t1 ).count();
   cout << "Time taken: " << duration / 1000000. << endl;
 
-  //gStyle->SetOptStat(0);
-  // Define Ellipse and integrate over this ring
-  // Naively assume that all photons are generated in middle of second aerogel layer.
-  double middlePoint = thickness + thickness / 2.;
-  double newX_0 = x_0 + middlePoint*dirX_0/dirZ_0;
-  double newY_0 = y_0 + middlePoint*dirY_0/dirZ_0;
-  double newDist = dist - middlePoint;
-  double dirTheta =  atan(sqrt(dirX_0*dirX_0 +dirY_0*dirY_0) / dirZ_0);
-  double chAngle = aerogel2->getChAngle();
-  // Calculate ellipse parameters
-  double radiusA = 0.5*newDist*TMath::Abs(tan(dirTheta+chAngle) - tan(dirTheta-chAngle));
-  double radiusB = 0.5*newDist*TMath::Abs(tan(chAngle) - tan(-chAngle));
-  // Distance travelled on detector plane with respect to travel direction
-  double deltaR = newDist*tan(dirTheta-chAngle) + radiusA;
-  // Multiply by X and Y components of direction to get final x and y position
-  double ringX, ringY;
-  if (dirX_0 != 0 || dirY_0 != 0) {
-    ringX = newX_0 + deltaR*dirX_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
-    ringY = newY_0 + deltaR*dirY_0/sqrt(dirX_0*dirX_0 +dirY_0*dirY_0);
-  } else {
-    ringX = newX_0;
-    ringY = newY_0;
-  }
-  // Rotate the ellipse by the particle's phi direction
-  double dirPhiDeg;
-  if (dirX_0 != 0) {
-    dirPhiDeg = atan(dirY_0/dirX_0)*180./TMath::Pi();
-  } else {
-    dirPhiDeg = 0.;
-  }
-  // Create two ellipses to encapsulate the photons
-  double ringOuterA = radiusA+1.5;
-  double ringOuterB = radiusB+1.5;
-  TEllipse *elOuter = new TEllipse(ringX,ringY,ringOuterA,ringOuterB, 0, 360, dirPhiDeg);
-  double ringInnerA = radiusA-1.5;
-  double ringInnerB = radiusB-1.5;
-  TEllipse *elInner = new TEllipse(ringX,ringY,ringInnerA,ringInnerB, 0, 360, dirPhiDeg);
-  TCutG *outerCut = createCutFromEllipse(elOuter);
-  TCutG *innerCut = createCutFromEllipse(elInner);
 
   // Draw out photon histogram and ellipse outline
   TCanvas *c1 = new TCanvas("c1","c1",600,500);
   c1->cd();
   photonHist->Draw("samecolz");
-  outerCut->Draw("same");
-  innerCut->Draw("same");
-  double nPhotons = outerCut->IntegralHist(photonHist) - innerCut->IntegralHist(photonHist);
-  cout << "Integrated number of photons in ring: " << nPhotons << endl;
+
+  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
+  cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
+
   photonHist->SaveAs("./output/photonHist.root");
   c1->SaveAs("./output/photonHist.pdf");
 
@@ -266,5 +294,42 @@ int main(int argc, char *argv[]) {
   c4->SaveAs("./output/numPhotonHist.pdf");
 
   f->Write();
+  return photonHist;
+}
+
+
+int main(int argc, char *argv[]) {
+  // Default beam parameters:
+  double beta = 0.999; // velocity of particle
+  double dirX_0 = 0.2; // beam initial direction
+  double dirY_0 = -0.00;
+  double x_0 = -0.0; // beam initial position
+  double y_0 = -0.0;
+  // Optional changes
+  if (argc >= 2) {
+    beta = atof(argv[1]);
+  }
+  if (argc >= 4) {
+    dirX_0 = atof(argv[2]);
+    dirY_0 = atof(argv[3]);
+  }
+  if (argc >= 6) {
+    x_0 = atof(argv[4]);
+    y_0 = atof(argv[5]);
+  }
+  cout << "Beta: " << beta << endl;
+  cout << "X Dir: " << dirX_0 << endl;
+  cout << "Y Dir: " << dirY_0 << endl;
+  cout << "X Pos: " << x_0 << endl;
+  cout << "Y Pos: " << y_0 << endl;
+  double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
+  TVector3 pos0 = TVector3(x_0, y_0, 0);
+  TVector3 dir0 = TVector3(dirX_0, dirY_0, dirZ_0);
+
+  // Generate a single candidate event to look at
+  TH2D* eventHist = generateEvent(pos0, dir0, beta);
+  // Generate photon PDF of beta hypothesis
+  TH2D* pdfHist = calculate_pdf(pos0, dir0, beta);
+
   return 0;
 };

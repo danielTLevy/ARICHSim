@@ -3,6 +3,7 @@
 const double lowWav = 290E-9;
 const double highWav = 700E-9;
 const double fineStructConst = 1./137;
+
 Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double beta) {
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
