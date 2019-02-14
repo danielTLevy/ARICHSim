@@ -27,6 +27,17 @@
 using namespace std;
 using namespace std::chrono;
 
+const  int nIter = 10000; // number of particles simulated for beam
+const  double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
+const  double thickness = 2.0; // thickness of aerogel layer
+const  double n1 = 1.035; // outer index of refraction
+const  double n2 = 1.045; // inner index of refraction
+const  double dist = 21.0; // dist to detector plane
+const  double errDirX = 0.0001; // beam direction error
+const  double errDirY = 0.0001;
+const  double errX = 0.0001; // beam position error
+const  double errY = 0.0001;
+
 struct photonStruct {
   // Initial direction and position
   double dirxi;
@@ -59,12 +70,7 @@ struct particleStruct {
 int main(int argc, char *argv[]) {
   //generateEvent(argc, argv);
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  int nIter = 10000; // number of particles simulated for beam
-  double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
-  double thickness = 2.0; // thickness of aerogel layer
-  double n1 = 1.035; // outer index of refraction
-  double n2 = 1.045; // inner index of refraction
-  double dist = 21.0; // dist to detector plane
+
 
   // Beam parameters:
   double beta = 0.999; // velocity of particle
@@ -73,10 +79,7 @@ int main(int argc, char *argv[]) {
   double dirY_0 = -0.00;
   double x_0 = -0.0; // beam initial position
   double y_0 = -0.0;
-  double errDirX = 0.0001; // beam direction error
-  double errDirY = 0.0001;
-  double errX = 0.0; // beam position error
-  double errY = 0.0;
+
 
   if (argc >= 2) {
     beta = atof(argv[1]);
@@ -89,22 +92,12 @@ int main(int argc, char *argv[]) {
     x_0 = atof(argv[4]);
     y_0 = atof(argv[5]);
   }
-  if (argc >= 10) {
-    errDirX =atof(argv[6]);
-    errDirY = atof(argv[7]);
-    errX = atof(argv[8]);
-    errY = atof(argv[9]);
-  }
+
   cout << "Beta: " << beta << endl;
   cout << "X Dir: " << dirX_0 << endl;
   cout << "Y Dir: " << dirY_0 << endl;
   cout << "X Pos: " << x_0 << endl;
   cout << "Y Pos: " << y_0 << endl;
-  cout << "X Dir Err: " << errDirX << endl;
-  cout << "Y Dir Err: " << errDirY << endl;
-  cout << "X Pos Err: " << errX << endl;
-  cout << "Y Pos Err: " << errY << endl;
-
   double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 pos_0 = TVector3(x_0, y_0, 0);
   TVector3 dir_0 = TVector3(dirX_0, dirY_0, dirZ_0);
@@ -144,7 +137,7 @@ int main(int argc, char *argv[]) {
     paStruct.posy = pa->pos0[1];
     paStruct.posz = pa->pos0[2];
     paStruct.id = i;
-    paBranch->Fill();
+    tree->Fill();
 
     // Make photons in first aerogel and scatter them
     std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
@@ -183,7 +176,7 @@ int main(int argc, char *argv[]) {
       phStruct.posye = phPos[1];
       phStruct.posze = phPos[2];
 
-      phBranch->Fill();
+      tree->Fill();
       scatterHist->Fill(ph->numScatters);
       wavHist->Fill(ph->getWavelength());
     }
