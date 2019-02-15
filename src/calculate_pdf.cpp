@@ -55,7 +55,9 @@ struct photonStruct {
   double posye;
   double posze; 
   // Parent particle
-  int paId;
+  int paid;
+  // Number of scatters
+  int numscat;
 };
 
 struct particleStruct {
@@ -193,7 +195,7 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
   TFile *f = new TFile("./output/photons.root","RECREATE");
   TTree *tree = new TTree("T","Output photon data");
   TBranch *phBranch = tree->Branch("photons",&phStruct.dirxi,
-    "dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:paId/i");
+    "dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:paid/i:numscat");
   TBranch *paBranch = tree->Branch("particles",&paStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:id/i");
 
   for (int i = 0; i < nIter; i++) {
@@ -206,7 +208,6 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
     paStruct.posy = pa->pos0[1];
     paStruct.posz = pa->pos0[2];
     paStruct.id = i;
-    tree->Fill();
 
     // Make photons in first aerogel and scatter them
     std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
@@ -225,7 +226,7 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
     for (int j = 0; j < photons.size(); j++) {
       Photon* ph = photons[j];
       // Save parent particle ID
-      phStruct.paId = i;
+      phStruct.paid = i;
       // Save initial direction and positions
       TVector3 phPos0 = ph->pos0;
       TVector3 phDir0 = ph->dir0;
@@ -244,6 +245,9 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
       phStruct.posxe = phPos[0];
       phStruct.posye = phPos[1];
       phStruct.posze = phPos[2];
+
+      // Save number of scattering events
+      phStruct.numscat = ph->numScatters;
 
       tree->Fill();
       scatterHist->Fill(ph->numScatters);
@@ -276,14 +280,6 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
 
   photonHist->SaveAs("./output/photonHist.root");
   c1->SaveAs("./output/photonHist.pdf");
-
-  // Count number of scatters
-  TCanvas *c2 = new TCanvas("c2","c2",600,500);
-  c2->cd();
-  c2->SetLogy();
-  scatterHist->Draw();
-  c2->SaveAs("./output/scatterCount.pdf");
-
 
   TCanvas *c3 = new TCanvas("c3","c3",600,500);
   c3->cd();
@@ -324,9 +320,9 @@ int main(int argc, char *argv[]) {
   cout << "Y Dir: " << dirY_0 << endl;
   cout << "X Pos: " << x_0 << endl;
   cout << "Y Pos: " << y_0 << endl;
-  double dirZ_0 = sqrt(1 - dirX_0*dirX_0 - dirY_0*dirY_0);
+  double dirZ_0 = sqrt(1. - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 pos0 = TVector3(x_0, y_0, 0);
-  TVector3 dir0 = TVector3(dirX_0, dirY_0, dirZ_0);
+  TVector3 dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();
 
   // Generate a single candidate event to look at
   TH2D* eventHist = generateEvent(pos0, dir0, beta);

@@ -89,12 +89,29 @@ bool Aerogel::isInAerogel(TVector3 pos) {
   return (TMath::Abs(pos[0]) <= width/2.)
           && (TMath::Abs(pos[1]) <= height/2.)
           && ((pos[2] - zPos) <= thickness)
-          && ((pos[2] - zPos) > 0);
+          && ((pos[2] - zPos) >= 0);
 }
 
 double Aerogel::getDistInGel(Particle* pa) {
   // calculate how far a particle has remaining in the gel
   return abs((zPos + thickness - pa->pos[2]) / pa->dir[2]);
+}
+
+void Aerogel::exitAerogel(Particle* pa) {
+  // Advance photon to edge of aerogel
+
+  // Get distance to each wall in direction of travel
+  double xDist = (TMath::Sign(width/2, pa->dir[0]) - pa->pos[0]) / pa->dir[0];
+  double yDist = (TMath::Sign(height/2, pa->dir[1]) - pa->pos[1]) / pa->dir[1];
+  double zDist = 0;
+  if (pa->dir[2] > 0.) {
+    zDist = (zPos + thickness - pa->pos[2]) / pa->dir[2];
+  } else {
+    zDist = (zPos - pa->pos[2]) / pa->dir[2];
+  }
+  double dists[3] = {xDist, yDist, zDist};
+  int locMinDist = TMath::LocMin(3, dists);
+  pa->travelDist(dists[locMinDist]+0.01);
 }
 
 int Aerogel::calcNumPhotons(double particleDist) {
@@ -119,7 +136,6 @@ double Aerogel::getRandomIntDistance(double wav) {
   // Invert the equation to get the x value that would get this random value
   double randY = randomGenerate->Uniform(0,1);
   return - intLength * log(1. - randY);
-
 }
 
 double Aerogel::getRandomScatAngle() {
@@ -130,8 +146,10 @@ double Aerogel::getRandomScatAngle() {
 void Aerogel::applyPhotonScatter(Photon* photon) {
   // Continuously scatter photon while the distance travelled before interacting
   // is less than the distance to exit the gel - update position and direction
+  if (!isInAerogel(photon->pos)) {
+    return;
+  }
   double intDist = getRandomIntDistance(photon->wav);
-  double gelDist = getDistInGel(photon);
   TVector3 newPos = photon->pos + intDist*photon->dir;
   TVector3 newDir = photon->dir;
   while (isInAerogel(newPos) && (photon->numScatters<=100)) {
@@ -141,7 +159,7 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
     TMatrixD rotMatrix = makeRotationMatrix(photon->dir);
     double scatTheta = getRandomScatAngle();
     double scatPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-    photon->dir = rotateVector(rotMatrix, scatTheta, scatPhi);
+    photon->dir = rotateVector(rotMatrix, scatTheta, scatPhi).Unit();
 
     // Predict where it might scatter next
     photon->numScatters += 1;
@@ -152,7 +170,13 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
 
 void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
   for(int i = 0; i < photons.size(); i++) {
-    applyPhotonScatter(photons[i]);
+    Photon* photon = photons[i];
+    if (isInAerogel(photon->pos)) {
+      // Scatter the photon
+      applyPhotonScatter(photon);
+      // Advance photon to edge of aerogel
+      exitAerogel(photon);
+    }
   }
 }
 
@@ -177,7 +201,7 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa, Detector* detector) 
       TVector3 phPos = pa->pos + phIntDist*pa->dir;
       // Get the direection of the new photon
       double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-      TVector3 dirCR = rotateVector(rotMatrix, chAngle, phPhi);
+      TVector3 dirCR = rotateVector(rotMatrix, chAngle, phPhi).Unit();
       // Get the wavelength of the photon
 
       Photon* photon = new Photon(phPos, dirCR, wav);

@@ -16,7 +16,7 @@
 
 class Aerogel {
 private:
-  double refractiveIndex=0.0;
+  double refractiveIndex=1.0;
   double thickness=0.0;
   double height=10.0;
   double width=10.0;
@@ -47,6 +47,7 @@ public:
   double getRefractiveIndex();
   double getThickness();
   double getZPos();
+  void exitAerogel(Particle*);
   bool isInAerogel(TVector3);
   void applyPhotonScatters(std::vector<Photon*>);
   std::vector<Photon*> generatePhotons(Particle*, Detector*);
