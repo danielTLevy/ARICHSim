@@ -26,16 +26,18 @@
 using namespace std;
 using namespace std::chrono;
 
-const  int nIter = 10000; // number of particles simulated for beam
-const  double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
-const  double thickness = 2.0; // thickness of aerogel layer
-const  double n1 = 1.035; // outer index of refraction
-const  double n2 = 1.045; // inner index of refraction
-const  double dist = 21.0; // dist to detector plane
-const  double errDirX = 0.0001; // beam direction error
-const  double errDirY = 0.0001;
-const  double errX = 0.0001; // beam position error
-const  double errY = 0.0001;
+const int nIter = 10000; // number of particles simulated for beam
+const double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
+const double thickness = 2.0; // thickness of aerogel layer
+const double width = 10.; // x width of aerogel
+const double height = 10.; // y height of aerogel
+const double n1 = 1.035; // outer index of refraction
+const double n2 = 1.045; // inner index of refraction
+const double dist = 21.0; // dist to detector plane
+const double errDirX = 0.0001; // beam direction error
+const double errDirY = 0.0001;
+const double errX = 0.0001; // beam position error
+const double errY = 0.0001;
 
 struct photonStruct {
   // Initial direction and position
@@ -130,12 +132,13 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   // Make the detector
   Detector* detector = new Detector(dist);
 
-  // Make photons in first aerogel and scatter them
+  // Make photons in first aerogel
   std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
-  aerogel1->applyPhotonScatters(photons);
   // Advance particle forward to next aerogel and generate photons
   pa->travelZDist(aeroPos[1] - aeroPos[0]);
   std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
+
+  aerogel1->applyPhotonScatters(photons);
 
   // Combine photons from both aerogels
   photons.insert(photons.end(), photons2.begin(), photons2.end());
@@ -180,6 +183,7 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
   // Get plots ready
   TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
+
   TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 400, 0, 400);
   TH1D *wavHist = new TH1D("wavHist", "wavHist", 200, 250E-9, 700E-9);
 

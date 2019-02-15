@@ -2,6 +2,7 @@
 #define DETECTOR_INCLUDE
 
 //Root
+#include "TMath.h"
 #include "TGraph.h"
 #include "beam.h"
 #include "photon.h"

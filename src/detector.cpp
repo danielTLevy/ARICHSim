@@ -50,7 +50,9 @@ double Detector::getFillFactor() {
 double Detector::evalQEff(double wav) {
   wav = wav*1E9;
   if (wav <= 687.) {
-    return max(0., quantumEff->Eval(wav)/100.);
+    return TMath::Max(0., quantumEff->Eval(wav)/100.);
+  } else {
+    return 0.;
   }
 }
 

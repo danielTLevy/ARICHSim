@@ -85,6 +85,13 @@ double Aerogel::getZPos() {
   return zPos;
 }
 
+bool Aerogel::isInAerogel(TVector3 pos) {
+  return (TMath::Abs(pos[0]) <= width/2.)
+          && (TMath::Abs(pos[1]) <= height/2.)
+          && ((pos[2] - zPos) <= thickness)
+          && ((pos[2] - zPos) > 0);
+}
+
 double Aerogel::getDistInGel(Particle* pa) {
   // calculate how far a particle has remaining in the gel
   return abs((zPos + thickness - pa->pos[2]) / pa->dir[2]);
@@ -125,19 +132,21 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
   // is less than the distance to exit the gel - update position and direction
   double intDist = getRandomIntDistance(photon->wav);
   double gelDist = getDistInGel(photon);
-
-  while ((intDist < gelDist) && (photon->numScatters <= 100)) {
+  TVector3 newPos = photon->pos + intDist*photon->dir;
+  TVector3 newDir = photon->dir;
+  while (isInAerogel(newPos) && (photon->numScatters<=100)) {
     // update position
-    photon->pos = photon->pos + intDist*photon->dir;
+    photon->pos = newPos;
     // update direction
     TMatrixD rotMatrix = makeRotationMatrix(photon->dir);
     double scatTheta = getRandomScatAngle();
     double scatPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
     photon->dir = rotateVector(rotMatrix, scatTheta, scatPhi);
 
+    // Predict where it might scatter next
     photon->numScatters += 1;
     intDist = getRandomIntDistance(photon->wav);
-    gelDist = getDistInGel(photon);
+    newPos = photon->pos + intDist*photon->dir;
   }
 }
 
@@ -146,7 +155,6 @@ void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
     applyPhotonScatter(photons[i]);
   }
 }
-
 
 std::vector<Photon*> Aerogel::generatePhotons(Particle* pa, Detector* detector) {
   // Create Cherenkov photons as the particle passes through the gel
