@@ -22,6 +22,8 @@ private:
   double width=10.0;
   double zPos=0.0;
   double chAngle = 0.0;
+  double upIndex = 1.0; //Upstream refractive index
+  double downIndex = 1.0; //Downstream refractive
   TF1 *wavPdf;
   TF1 *scatAngleFunc;
   std::shared_ptr<TRandom3> randomGenerate;
@@ -36,6 +38,7 @@ private:
   static double calcdNdX(double, double);
   double getRandomWav();
   double getRandomScatAngle();
+  void refractPhoton(Photon*);
   void applyPhotonScatter(Photon*);
   double getIntLengthForWav(double);
   double getRandomIntDistance(double);
@@ -47,7 +50,9 @@ public:
   double getRefractiveIndex();
   double getThickness();
   double getZPos();
-  void exitAerogel(Particle*);
+  void setUpIndex(double);
+  void setDownIndex(double);
+  void exitAerogel(Photon*);
   bool isInAerogel(TVector3);
   void applyPhotonScatters(std::vector<Photon*>);
   std::vector<Photon*> generatePhotons(Particle*, Detector*);

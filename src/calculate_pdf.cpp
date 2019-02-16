@@ -130,6 +130,9 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   // Make Aerogel layer
   Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
   Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
+  // Make them aware of each other for refraction purposes
+  aerogel1->setDownIndex(n2);
+  aerogel2->setUpIndex(n1);
 
   // Make the detector
   Detector* detector = new Detector(dist);
@@ -179,6 +182,9 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
   // Make Aerogel layer
   Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
   Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
+  // Make them aware of each other for refraction purposes
+  aerogel1->setDownIndex(n2);
+  aerogel2->setUpIndex(n1);
 
   // Make the detector
   Detector* detector = new Detector(dist);

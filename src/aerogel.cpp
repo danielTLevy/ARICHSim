@@ -69,6 +69,14 @@ std::vector<double> Aerogel::readInteractionLength(double n) {
   return intLengths;
 }
 
+void Aerogel::setUpIndex(double n) {
+  this->upIndex = n;
+}
+
+void Aerogel::setDownIndex(double n) {
+  this->downIndex = n;
+}
+
 double Aerogel::getRandomWav() {
   return wavPdf->GetRandom();
 }
@@ -97,21 +105,41 @@ double Aerogel::getDistInGel(Particle* pa) {
   return abs((zPos + thickness - pa->pos[2]) / pa->dir[2]);
 }
 
-void Aerogel::exitAerogel(Particle* pa) {
-  // Advance photon to edge of aerogel
+void Aerogel::exitAerogel(Photon* ph) {
+  // Advance photon to edge of aerogel and refract
 
   // Get distance to each wall in direction of travel
-  double xDist = (TMath::Sign(width/2, pa->dir[0]) - pa->pos[0]) / pa->dir[0];
-  double yDist = (TMath::Sign(height/2, pa->dir[1]) - pa->pos[1]) / pa->dir[1];
+  double xDist = (TMath::Sign(width/2, ph->dir[0]) - ph->pos[0]) / ph->dir[0];
+  double yDist = (TMath::Sign(height/2, ph->dir[1]) - ph->pos[1]) / ph->dir[1];
+
+  bool forwardZ = ph->dir[2] > 0.;
   double zDist = 0;
-  if (pa->dir[2] > 0.) {
-    zDist = (zPos + thickness - pa->pos[2]) / pa->dir[2];
+  if (forwardZ) {
+    zDist = (zPos + thickness - ph->pos[2]) / ph->dir[2];
   } else {
-    zDist = (zPos - pa->pos[2]) / pa->dir[2];
+    zDist = (zPos - ph->pos[2]) / ph->dir[2];
   }
+  // Pick the x y or z dimension with the closest wall and travel that way
   double dists[3] = {xDist, yDist, zDist};
-  int locMinDist = TMath::LocMin(3, dists);
-  pa->travelDist(dists[locMinDist]+0.01);
+  int minDistDimension = TMath::LocMin(3, dists);
+  ph->travelDist(dists[minDistDimension]+0.01);
+
+  // Get the normal vector of that wall
+  TVector3 incidentPlane = TVector3(0.,0.,0.);
+  incidentPlane[minDistDimension] = TMath::Sign(1, -ph->dir[minDistDimension]);
+  // Get the index of the refraction of the material being entered
+  double n2 = 1.0; // Air by default
+  if (minDistDimension==2) {
+    if (forwardZ) {
+      n2 = downIndex;
+    } else {
+      n2 = upIndex;
+    }
+  }
+
+  // Refract the light
+  ph->dir = refractedDirection(ph->dir, incidentPlane, refractiveIndex, n2);
+
 }
 
 int Aerogel::calcNumPhotons(double particleDist) {

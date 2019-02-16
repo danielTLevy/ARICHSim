@@ -46,6 +46,21 @@ static TVector3 rotateVector(TMatrixD rot, double theta, double phi) {
   return rot*dir;
 }
 
+static TVector3 refractedDirection(TVector3 l, TVector3 n, double n1, double n2) {
+  //From: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+  // light w/ normalized direction l incident on surface w/ normal n, from indices n1 to n2
+  double c = -l*n; // cos(theta1) = - l dot n
+  double r = n1 / n2;
+  return r*l + (r*c - sqrt(1-r*r*(1-c*c)))*n;
+}
+
+static TVector3 reflectedDirection(TVector3 l, TVector3 n, double n1, double n2) {
+  //From: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+  // light w/ normalized direction l incident on surface w/ normal n, from indices n1 to n2
+  double c = -l*n; // cos(theta1) = - l dot n
+  return l + 2*c*n;
+}
+
 static TCutG *createCutFromEllipse(TEllipse *ellipse) {
   int np = 200;
   double angle,dx,dy;
