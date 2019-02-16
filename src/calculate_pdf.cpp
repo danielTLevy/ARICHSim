@@ -39,6 +39,9 @@ const double errDirY = 0.0001;
 const double errX = 0.0001; // beam position error
 const double errY = 0.0001;
 
+const char* particleNames[3] = {"Pi", "Proton", "Kaon"};
+const double particleMasses[3] = {0.1395701, 0.938272, 0.493677};
+
 struct photonStruct {
   // Initial direction and position
   double dirxi;
@@ -69,6 +72,11 @@ struct particleStruct {
   double posz;
   int id;
 };
+
+double calcBeta(int particlei, double mom) {
+  double M = particleMasses[particlei];
+  return sqrt(1/(1 + M*M/(mom*mom)));
+}
 
 double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TCanvas* canvas, Aerogel* aerogel) {
   // Define Ellipse and integrate over this ring
@@ -302,11 +310,13 @@ TH2D* calculate_pdf(TVector3 pos0, TVector3 dir0, double beta) {
 }
 
 
-int main(int argc, char *argv[]) {
+
+
+int mainWithBeamParameters(int argc, char *argv[]) {
   // Default beam parameters:
   double beta = 0.999; // velocity of particle
-  double dirX_0 = 0.2; // beam initial direction
-  double dirY_0 = -0.00;
+  double dirX_0 = 0.0; // beam initial direction
+  double dirY_0 = 0.0;
   double x_0 = -0.0; // beam initial position
   double y_0 = -0.0;
   // Optional changes
@@ -331,9 +341,21 @@ int main(int argc, char *argv[]) {
   TVector3 dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();
 
   // Generate a single candidate event to look at
-  TH2D* eventHist = generateEvent(pos0, dir0, beta);
+  //TH2D* eventHist = generateEvent(pos0, dir0, beta);
   // Generate photon PDF of beta hypothesis
   TH2D* pdfHist = calculate_pdf(pos0, dir0, beta);
 
   return 0;
 };
+
+int main(int argc, char *argv[]) {
+  // Given particle and momentum, simulate centered beam
+  int particlei = atoi(argv[1]);
+  double particleMom = atof(argv[2]);
+  double beta = calcBeta(particlei, particleMom);
+  cout << "Particle: " << particleNames[particlei] << endl;
+  cout << "Momentum: " << particleMom << " GeV" << endl;
+  cout << "Beta: " << beta << endl;
+  calculate_pdf(TVector3(0.,0.,0.), TVector3(0.,0.,1.), beta);
+  return 0;
+}
