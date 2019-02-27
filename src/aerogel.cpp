@@ -105,7 +105,7 @@ double Aerogel::getDistInGel(Particle* pa) {
   return abs((zPos + thickness - pa->pos[2]) / pa->dir[2]);
 }
 
-void Aerogel::exitAerogel(Photon* ph) {
+void Aerogel::exitAerogel(Photon* ph, bool refract) {
   // Advance photon to edge of aerogel and refract
 
   // Get distance to each wall in direction of travel
@@ -127,19 +127,30 @@ void Aerogel::exitAerogel(Photon* ph) {
   // Get the normal vector of that wall
   TVector3 incidentPlane = TVector3(0.,0.,0.);
   incidentPlane[minDistDimension] = TMath::Sign(1, -ph->dir[minDistDimension]);
-  // Get the index of the refraction of the material being entered
-  double n2 = 1.0; // Air by default
-  if (minDistDimension==2) {
-    if (forwardZ) {
-      n2 = downIndex;
-    } else {
-      n2 = upIndex;
+
+  if (refract) {
+    // Get the index of the refraction of the material being entered
+    double n2 = 1.0; // Air by default
+    if (minDistDimension==2) {
+      if (forwardZ) {
+        n2 = downIndex;
+      } else {
+        n2 = upIndex;
+      }
+    }
+    // Refract the light
+     ph->dir = refractedDirection(ph->dir, incidentPlane, refractiveIndex, n2);
+  }
+}
+
+void Aerogel::exitAerogel(std::vector<Photon*> photons, bool refract) {
+  for(int i = 0; i < photons.size(); i++) {
+    Photon* photon = photons[i];
+    if (isInAerogel(photon->pos)) {
+      // Scatter the photon
+      exitAerogel(photon, refract);
     }
   }
-
-  // Refract the light
-  ph->dir = refractedDirection(ph->dir, incidentPlane, refractiveIndex, n2);
-
 }
 
 int Aerogel::calcNumPhotons(double particleDist) {
@@ -202,8 +213,6 @@ void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
     if (isInAerogel(photon->pos)) {
       // Scatter the photon
       applyPhotonScatter(photon);
-      // Advance photon to edge of aerogel
-      exitAerogel(photon);
     }
   }
 }

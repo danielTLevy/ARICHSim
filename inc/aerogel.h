@@ -52,7 +52,8 @@ public:
   double getZPos();
   void setUpIndex(double);
   void setDownIndex(double);
-  void exitAerogel(Photon*);
+  void exitAerogel(Photon*,  bool refract = true);
+  void exitAerogel(std::vector<Photon*>, bool refract = true);
   bool isInAerogel(TVector3);
   void applyPhotonScatters(std::vector<Photon*>);
   std::vector<Photon*> generatePhotons(Particle*, Detector*);
