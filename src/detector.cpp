@@ -64,4 +64,15 @@ void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons) {
   }
 }
 
+void Detector::projectPhotons(TH2D* photonHist, TH1D* rHist, std::vector<Photon*> photons) {
+  for (int j = 0; j < photons.size(); j++) {
+    Photon* ph = photons[j];
+    double phDist = ph->dist(zPos);
+    double xFinal = ph->pos[0] + phDist*ph->dir[0];
+    double yFinal = ph->pos[1] + phDist*ph->dir[1];
+    photonHist->Fill(xFinal, yFinal);
+    rHist->Fill(sqrt(xFinal*xFinal + yFinal*yFinal));
+  }
+}
+
 

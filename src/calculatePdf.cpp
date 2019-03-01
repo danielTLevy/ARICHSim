@@ -26,7 +26,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const int nEvents = 1000; // number of particles simulated for beam
+const int nEvents = 10000; // number of particles simulated for beam
 const double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
 const double thickness = 2.0; // thickness of aerogel layer
 const double width = 10.; // x width of aerogel
@@ -132,7 +132,7 @@ double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* 
   return outerCut->IntegralHist(photonHist) - innerCut->IntegralHist(photonHist);
 }
 
-
+/*
 TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   // Generate a single particle event
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
@@ -201,6 +201,7 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
 
   return photonHist;
 }
+*/
 
 TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
@@ -221,7 +222,7 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   // Get plots ready
   TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
   TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
-
+  TH1D *rHist = new TH1D("rHist", "rHist", 500, 0., 10.);
   TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 400, 0, 400);
   TH1D *wavHist = new TH1D("wavHist", "wavHist", 200, 250E-9, 700E-9);
 
@@ -254,24 +255,24 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
 
     // Scatter photons in first aerogel, move them forwards out of aerogel
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, true);
+    aerogel1->exitAerogel(photons, false);
 
     // Combine photons from both aerogels
     photons.insert(photons.end(), photons2.begin(), photons2.end());
 
     // Include scattering in second aerogel
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, true);
+    aerogel2->exitAerogel(photons, false);
 
     // Do some more scattering, for the heck of it
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, true);
+    aerogel1->exitAerogel(photons, false);
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, true);
+    aerogel2->exitAerogel(photons, false);
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, true);
+    aerogel1->exitAerogel(photons, false);
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, true);
+    aerogel2->exitAerogel(photons, false);
 
     for (int j = 0; j < photons.size(); j++) {
       Photon* ph = photons[j];
@@ -307,13 +308,13 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
     numPhotonHist->Fill(photons.size());
 
     // Project photons onto detector and plot distribution
-    detector->projectPhotons(photonHist, photons);
+    detector->projectPhotons(photonHist, rHist, photons);
   }
 
   // Scale photon histogram to the number of iterations
-  //photonHist->Scale(1. / nEvents);
+  photonHist->Scale(1. / nEvents);
   // Scale photon to fill factor of detector
-  // photonHist->Scale(detector->getFillFactor());
+  photonHist->Scale(detector->getFillFactor());
 
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
@@ -330,18 +331,28 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   right_pad->Draw();
   TPad *top_pad = new TPad("top_pad", "top_pad",0.0,0.55,0.6,1.0);
   top_pad->Draw();
-  gStyle->SetOptStat(0);
+
+  TPad *corner_pad = new TPad("corner_pad", "corner_pad",0.55,0.55,1.0,1.0);
+  corner_pad->Draw();
+
+ // gStyle->SetOptStat(0);
 
   center_pad->cd();
+  center_pad->SetGrid(1);
   photonHist->Draw("colz");
 
   right_pad->cd();
+  right_pad->SetGrid(1);
   photonHist->ProjectionY()->Draw("hbar");
 
   top_pad->cd();
+  top_pad->SetGrid(1);
   photonHist->ProjectionX()->Draw("bar");
 
-  photonHist->Draw("samecolz");
+  corner_pad->cd();
+  corner_pad->SetGrid(1);
+  rHist->Draw("bar");
+
 
   double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
   cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
@@ -372,7 +383,7 @@ int mainPID(int argc, char *argv[]) {
   cout << "Particle: " << particleNames[particlei] << endl;
   cout << "Momentum: " << particleMom << " GeV" << endl;
   cout << "Beta: " << beta << endl;
-  TH2D* generatedEvent = generateEvent(pos0, dir0, beta);
+  //TH2D* generatedEvent = generateEvent(pos0, dir0, beta);
   for (int i = 0; i < 3; i++) {
     double beta0 = calcBeta(i, particleMom);
     // calculate within 2 standard deviations of each particle hypothesis

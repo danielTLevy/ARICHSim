@@ -21,6 +21,8 @@ public:
   double evalQEff(double);
   double getFillFactor();
   void projectPhotons(TH2D*,  std::vector<Photon*> );
+  void projectPhotons(TH2D*, TH1D*, std::vector<Photon*> );
+
 };
 
 #endif
