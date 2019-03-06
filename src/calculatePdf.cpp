@@ -31,8 +31,8 @@ const double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
 const double thickness = 2.0; // thickness of aerogel layer
 const double width = 10.; // x width of aerogel
 const double height = 10.; // y height of aerogel
-const double n1 = 1.035; // outer index of refraction
-const double n2 = 1.045; // inner index of refraction
+const double n1 = 1.0352; // outer index of refraction
+const double n2 = 1.0452; // inner index of refraction
 const double dist = 21.0; // dist to detector plane
 const double errDirX = 0.000; // beam direction error
 const double errDirY = 0.000;
@@ -81,7 +81,7 @@ double calcBeta(int particlei, double mom) {
   return sqrt(1/(1 + M*M/(mom*mom)));
 }
 
-double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TCanvas* canvas, Aerogel* aerogel) {
+double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel) {
   // Define Ellipse and integrate over this ring
   double dirX_0 = dir0[0];
   double dirY_0 = dir0[1];
@@ -125,7 +125,7 @@ double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* 
   TCutG *outerCut = createCutFromEllipse(elOuter);
   TCutG *innerCut = createCutFromEllipse(elInner);
 
-  canvas->cd();
+  pad->cd();
   outerCut->Draw("same");
   innerCut->Draw("same");
 
@@ -206,25 +206,21 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
 TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-  // Generate beam
+  // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
-  beam->makeParticles(nEvents);
-
   // Make Aerogel layer
   Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
   Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
   // Make them aware of each other for refraction purposes
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
-
   // Make the detector
   Detector* detector = new Detector(dist);
+
+
   // Get plots ready
   TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
-  TH1D *scatterHist = new TH1D("scatterHist", "scatterHist", 101, 0, 100);
   TH1D *rHist = new TH1D("rHist", "rHist", 500, 0., 10.);
-  TH1D *numPhotonHist = new TH1D("numPhotonHist", "numPhotonHist", 400, 0, 400);
-  TH1D *wavHist = new TH1D("wavHist", "wavHist", 200, 250E-9, 700E-9);
 
   // Make a tree to save the photons
   photonStruct phStruct;
@@ -235,8 +231,9 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
     "dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:wav:paid/i:numscat");
   TBranch *paBranch = tree->Branch("particles",&paStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:id/i");
 
+  // Make events and loop over them
+  beam->makeParticles(nEvents);
   for (int i = 0; i < nEvents; i++) {
-    // Generate particles
     Particle *pa = beam->getParticle(i);
     paStruct.dirx = pa->dir0[0];
     paStruct.diry = pa->dir0[1];
@@ -248,37 +245,30 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
 
     // Make photons in first aerogel
     std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
-
     // Advance particle forward to next aerogel and generate photons
     pa->travelZDist(aeroPos[1] - aeroPos[0]);
     std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
-
     // Scatter photons in first aerogel, move them forwards out of aerogel
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, false);
-
+    aerogel1->exitAerogel(photons, true);
     // Combine photons from both aerogels
     photons.insert(photons.end(), photons2.begin(), photons2.end());
-
     // Include scattering in second aerogel
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, false);
-
-    // Do some more scattering, for the heck of it
+    aerogel2->exitAerogel(photons, true);
+    // Do some more scattering
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, false);
+    aerogel1->exitAerogel(photons, true);
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, false);
+    aerogel2->exitAerogel(photons, true);
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, false);
+    aerogel1->exitAerogel(photons, true);
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, false);
-
+    aerogel2->exitAerogel(photons, true);
+    // Save photons to TTree
     for (int j = 0; j < photons.size(); j++) {
       Photon* ph = photons[j];
-      // Save parent particle ID
       phStruct.paid = i;
-      // Save initial direction and positions
       TVector3 phPos0 = ph->pos0;
       TVector3 phDir0 = ph->dir0;
       phStruct.dirxi = phDir0[0];
@@ -287,7 +277,6 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
       phStruct.posxi = phPos0[0];
       phStruct.posyi = phPos0[1];
       phStruct.poszi = phPos0[2];
-      // Save exit direction and positions
       TVector3 phPos = ph->pos;
       TVector3 phDir = ph->dir;
       phStruct.dirxe = phDir[0];
@@ -296,16 +285,9 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
       phStruct.posxe = phPos[0];
       phStruct.posye = phPos[1];
       phStruct.posze = phPos[2];
-
       phStruct.wav = ph->wav;
-
-      // Save number of scattering events
-      phStruct.numscat = ph->numScatters;
-
       tree->Fill();
-      scatterHist->Fill(ph->numScatters);
     }
-    numPhotonHist->Fill(photons.size());
 
     // Project photons onto detector and plot distribution
     detector->projectPhotons(photonHist, rHist, photons);
@@ -317,10 +299,10 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   photonHist->Scale(detector->getFillFactor());
 
 
+
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>( t2 - t1 ).count();
   cout << "Time taken: " << duration / 1000000. << endl;
-
 
   // Draw out photon histogram and ellipse outline
   TCanvas *c1 = new TCanvas("c1","c1",900,900);
@@ -335,36 +317,30 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   TPad *corner_pad = new TPad("corner_pad", "corner_pad",0.55,0.55,1.0,1.0);
   corner_pad->Draw();
 
- // gStyle->SetOptStat(0);
+
+
 
   center_pad->cd();
   center_pad->SetGrid(1);
   photonHist->Draw("colz");
 
+  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, center_pad, aerogel2);
+  cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
+
   right_pad->cd();
   right_pad->SetGrid(1);
-  photonHist->ProjectionY()->Draw("hbar");
+  photonHist->ProjectionY()->Draw("HIST");
 
   top_pad->cd();
   top_pad->SetGrid(1);
-  photonHist->ProjectionX()->Draw("bar");
+  photonHist->ProjectionX()->Draw("HIST");
 
   corner_pad->cd();
   corner_pad->SetGrid(1);
   rHist->Draw("bar");
 
 
-  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
-  cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
-
-  photonHist->SaveAs("./output/photonHist.root");
-  c1->SaveAs("./output/photonHist.pdf");
-
-
-  TCanvas *c4 = new TCanvas("c4","c4",600,500);
-  c4->cd();
-  numPhotonHist->Draw();
-  c4->SaveAs("./output/numPhotonHist.pdf");
+  c1->SaveAs("./output/photonHistWithProjections.root");
 
   f->Write();
   return photonHist;

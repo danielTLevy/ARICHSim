@@ -1,7 +1,7 @@
 #include "aerogel.h"
 
-const double lowWav = 270E-9;
-const double highWav = 700E-9;
+const double lowWav = 248E-9;
+const double highWav = 775E-9;
 const double fineStructConst = 1./137;
 
 Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double beta) {
@@ -12,7 +12,7 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double b
   this->zPos = zPos;
   this->chAngle = calcChAngle(refractiveIndex, beta);
   this->wavPdf = calcWavPdf(refractiveIndex, beta);
-  this->scatAngleFunc = new TF1("scatPdf", "(1 + pow(cos(x), 2))", 0, 2*TMath::Pi());
+  this->scatAngleFunc = new TF1("scatPdf", "(1 + pow(cos(x), 2))", 0, TMath::Pi());
   this->dNdX = calcdNdX(refractiveIndex, beta);
   this->interactionLengths = readInteractionLength(refractiveIndex);
 }
@@ -68,6 +68,7 @@ std::vector<double> Aerogel::readInteractionLength(double n) {
 
   return intLengths;
 }
+
 
 void Aerogel::setUpIndex(double n) {
   this->upIndex = n;
