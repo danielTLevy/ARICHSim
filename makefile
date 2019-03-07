@@ -11,7 +11,7 @@ CFLAGS=-c -g -Wall `root-config --cflags` -I${INCDIR}
 LDFLAGS=`root-config --glibs` -lHistPainter
 
 # File names
-EXEC = $(BINDIR)/final.out
+EXEC = $(BINDIR)/arichsim
 FILES= $(wildcard $(SRCDIR)/*.cpp)
 SOURCES=$(FILES)
 

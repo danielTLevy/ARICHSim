@@ -323,19 +323,29 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
 }
 
 
+double computeLogLikelihood(TH2D* event, TH2D* distribution) {
+    int nBins = event->GetSize();
+    if (nBins != distribution->GetSize()) {
+        throw "Error: Bin Mismatch";
+    }
+    double logLikelihood = 0.;
+    for (int i = 0; i < nBins; i++) {
+        double lambda = distribution->GetBinContent(i);
+        bool pixelHit = event->GetBinContent(i) > 0;
+        if (pixelHit) {
+            logLikelihood += log(exp(-lambda));
+        } else {
+            logLikelihood += log(1 - exp(-lambda));
+        }
+    }
+    return logLikelihood;
+}
 
-int mainPID(int argc, char *argv[]) {
+
+void particleID(int particlei, double particleMom, TVector3 pos0, TVector3 dir0) {
   // Given particle, momentum, simulate example event
   // Assume centered for now
-
-  int particlei = atoi(argv[1]);
-  double particleMom = atof(argv[2]);
   double beta = calcBeta(particlei, particleMom);
-  TVector3 pos0 = TVector3(0.,0.,0.);
-  TVector3 dir0 = TVector3(0.,0.,1.);
-  cout << "Particle: " << particleNames[particlei] << endl;
-  cout << "Momentum: " << particleMom << " GeV" << endl;
-  cout << "Beta: " << beta << endl;
   TH2D* generatedEvent = generateEvent(pos0, dir0, beta);
   for (int i = 0; i < 3; i++) {
     double beta0 = calcBeta(i, particleMom);
@@ -344,52 +354,68 @@ int mainPID(int argc, char *argv[]) {
       TH2D *calculatedPdf = calculatePdf(pos0, dir0, beta + i*errBeta);
     }
   }
-
 }
 
-int mainWithBeamParameters(int argc, char *argv[]) {
-  // Default beam parameters:
+
+//int mainCalculatePdf(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
+  if (argc == 1) {
+    cerr << "Usage: " << argv[0] << endl
+         << "Make distribution given Geant4 Params: -g <pid> <mom>" << endl
+         << "Make distribution given beam:          -b [beta xdir ydir xpos ypos]" << endl
+         << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl;
+    return -1;
+  }
+  string mode = string(argv[1]);
+
+  // Set particle parameters
   double beta = 0.999; // velocity of particle
-  double dirX_0 = 0.0; // beam initial direction
-  double dirY_0 = 0.0;
-  double x_0 = -0.0; // beam initial position
-  double y_0 = -0.0;
-  // Optional changes
-  if (argc >= 2) {
-    beta = atof(argv[1]);
+  double dirX_0, dirY_0, x_0, y_0 ;
+  dirX_0 = dirY_0 = x_0 = y_0 = 0;
+  int particlei = 0;
+  double particleMom = 0;
+  int offset = 0;
+  if (mode ==  "-g" || mode == "-p") {
+    offset = 2;
+    particlei = atoi(argv[2]);
+    particleMom = atof(argv[3]);
+    cout << "Particle: " << particleNames[particlei] << endl;
+    cout << "Momentum: " << particleMom << " GeV" << endl;
   }
-  if (argc >= 4) {
-    dirX_0 = atof(argv[2]);
-    dirY_0 = atof(argv[3]);
+  if (mode == "-b" && argc > 2) {
+    offset = 1;
+    beta = atof(argv[2]);
   }
-  if (argc >= 6) {
-    x_0 = atof(argv[4]);
-    y_0 = atof(argv[5]);
+  if (argc >= offset + 5) {
+    dirX_0 = atof(argv[offset + 3]);
+    dirY_0 = atof(argv[offset + 4]);
   }
-  cout << "Beta: " << beta << endl;
+  if (argc >= offset + 7) {
+    x_0 = atof(argv[offset + 5]);
+    y_0 = atof(argv[offset + 6]);
+  }
   cout << "X Dir: " << dirX_0 << endl;
   cout << "Y Dir: " << dirY_0 << endl;
   cout << "X Pos: " << x_0 << endl;
   cout << "Y Pos: " << y_0 << endl;
+
+  // Do the thing
+  if (mode == "-g") {
+    // Given particle and momentum, simulate centered beam à la Geant4
+    beta = calcBeta(particlei, particleMom);
+    cout << "Beta: " << beta << endl;
+    calculatePdf(TVector3(0.,0.,0.), TVector3(0.,0.,1.), beta);
+  }
+
   double dirZ_0 = sqrt(1. - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 pos0 = TVector3(x_0, y_0, 0);
   TVector3 dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();
 
-  // Generate a single candidate event to look at
-  //TH2D* eventHist = generateEvent(pos0, dir0, beta);
-  // Generate photon PDF of beta hypothesis
-  TH2D* pdfHist = calculatePdf(pos0, dir0, beta);
-  return 0;
-};
+  if (mode == "-b") {
+    calculatePdf(pos0, dir0, beta);
+  }
 
-int main(int argc, char *argv[]) {
-  // Given particle and momentum, simulate centered beam
-  int particlei = atoi(argv[1]);
-  double particleMom = atof(argv[2]);
-  double beta = calcBeta(particlei, particleMom);
-  cout << "Particle: " << particleNames[particlei] << endl;
-  cout << "Momentum: " << particleMom << " GeV" << endl;
-  cout << "Beta: " << beta << endl;
-  calculatePdf(TVector3(0.,0.,0.), TVector3(0.,0.,1.), beta);
-  return 0;
+  if (mode == "-p") {
+    particleID(particlei, particleMom, pos0,  dir0);
+  }
 }
