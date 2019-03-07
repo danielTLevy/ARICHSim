@@ -12,7 +12,7 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double b
   this->zPos = zPos;
   this->chAngle = calcChAngle(refractiveIndex, beta);
   this->wavPdf = calcWavPdf(refractiveIndex, beta);
-  this->scatAngleFunc = new TF1("scatPdf", "(1 + pow(cos(x), 2))", 0, TMath::Pi());
+  this->scatAngleFunc = new TF1("scatPdf", "1 + x*x", -1, 1);
   this->dNdX = calcdNdX(refractiveIndex, beta);
   this->interactionLengths = readInteractionLength(refractiveIndex);
 }
@@ -180,7 +180,7 @@ double Aerogel::getRandomIntDistance(double wav) {
 
 double Aerogel::getRandomScatAngle() {
   // Rayleigh scattering is proportional to  1 + cos^2(theta)
-  return scatAngleFunc->GetRandom();
+  return TMath::ACos(scatAngleFunc->GetRandom());
 }
 
 void Aerogel::applyPhotonScatter(Photon* photon) {
