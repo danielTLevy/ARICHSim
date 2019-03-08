@@ -1,25 +1,13 @@
 #include "TGraph.h"
 #include "TTreeReader.h"
 
-struct EventEntry{
-  Int_t eventNumber;
-  Int_t trackNumber;
-  Int_t pid;
-  Double_t pos[3]; 
-  Double_t mom[3];
-  Double_t dir[3];
-  Int_t stateID;
-  Int_t prodCode;
-  string material1;
-  string material2;
-  string volume1;
-  string volume2;
-  Double_t fourMomTransfer;
-};
-
 Double_t fillFactor = 0.8*0.87;
+int nEvents = 100000.;
 
-void makeHistProfiles() {
+void makeHistProfiles(char* output) {
+	/*
+	Convert the photons from a GEANT4 into several useful histograms that match up to the outputs of the ARICH Sim 
+	*/
 	TGraph *qe = new TGraph();
 	qe->SetPoint(0,267.60597413356646, 13.28179513808478);
 	qe->SetPoint(1,275.5511575459106, 18.57988946896094);
@@ -52,16 +40,16 @@ void makeHistProfiles() {
 	qe->SetPoint(28,675.5028305794633, 0.03476537833796253);
 	qe->SetPoint(29,686.4857090256363, 0.01427881998143405);
 
-	TH2D *photonHist = new TH2D("photonHist","photonHist",48,-150,150,48,-150,150);
-	TH1D *rHist = new TH1D("rHist", "rHist", 500, 0., 100.);
 
-	TFile *runFile = TFile::Open("./EMPHATICSim-build/test_exitonly.root");
+	TH2D *photonHist = new TH2D("g4photonHist","g4photonHist",48,-15,15,48,-15,15);
+	TH1D *rHist = new TH1D("g4rHist", "g4rHist", 500, 0., 10.);
+
+	TFile *runFile = TFile::Open(Form("./EMPHATICSim-build/investigation/%s.root", output));
 	TTreeReader reader("h1000", runFile);
 	TTreeReaderValue<Int_t> raPid(reader, "Pid");
 	TTreeReaderArray<Double_t> raMom(reader, "Mom");
 	TTreeReaderArray<Double_t> raPos(reader, "Pos");
 	TTreeReaderArray<Double_t> raDir(reader, "Dir");
-	TRandom3 randomGen = TRandom3();
 	while (reader.Next()) {
 		if (*raPid != 0 || raPos[2] < 829.99) {
 			continue;
@@ -71,12 +59,12 @@ void makeHistProfiles() {
 		// Wavelength in nm (multiply by c and planck's constant in eV*s)
 		Double_t wav = 1E9 *299792458 * 4.135667662E-15 / (1E9 * mom);
 		Double_t qEff = max(qe->Eval(wav) / 100., 0.);
-		Double_t xFinal = raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2];
-		Double_t yFinal = raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2];
+		// Project onto detector, and convert from mm to cm
+		Double_t xFinal = 0.1*(raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2]);
+		Double_t yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
 		
-		photonHist->Fill(xFinal, yFinal, fillFactor*qEff/1000.);
-		rHist->Fill(sqrt(xFinal*xFinal + yFinal*yFinal), fillFactor*qEff/1000.);
-		
+		photonHist->Fill(xFinal, yFinal, fillFactor*qEff/nEvents);
+		rHist->Fill(sqrt(xFinal*xFinal + yFinal*yFinal), fillFactor*qEff/nEvents);
 	}
 	TCanvas *c1 = new TCanvas("c1", "c1",900,900);
 	TPad *center_pad = new TPad("center_pad", "center_pad",0.0,0.0,0.6,0.6);
@@ -107,10 +95,10 @@ void makeHistProfiles() {
 
 	int leftbin = rHist->GetXaxis()->FindBin(48.);
 	int rightbin = rHist->GetXaxis()->FindBin(60.);
-	cout << "Number of photons: " << rHist->Integral(leftbin, rightbin);
+	cout << "Number of photons: " << rHist->Integral(leftbin, rightbin) << endl;
 	//gStyle->SetOptStat(0);
 	
-	c1->SaveAs("histWithProjections.root");
-	photonHist->SaveAs("photonHist.root");
-	rHist->SaveAs("rHist.root");
+	c1->SaveAs(Form("./EMPHATICSim-build/investigation/%sOutput.root", output));
+	rHist->SaveAs(Form("./EMPHATICSim-build/investigation/%sRHist.root", output));
+	photonHist->SaveAs(Form("./EMPHATICSim-build/investigation/%sPhotonHist.root", output));
 }
