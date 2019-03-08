@@ -50,8 +50,6 @@ std::vector<double> Aerogel::readInteractionLength(double n) {
   }
   // Get the corresponding file of interaction lengths
   std::string fileName = "./data/" + files[minI] + "IntLength.csv";
-  std::cout << "Reading aerogel data from: " << fileName << std::endl;
-
   std::ifstream intLengthFile(fileName);
 
   std::vector<double> wavs;

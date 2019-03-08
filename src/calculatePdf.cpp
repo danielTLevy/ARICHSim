@@ -39,7 +39,6 @@ const double errDirX = 0.000; // beam direction error
 const double errDirY = 0.000;
 const double errX = 0.001; // beam position error
 const double errY = 0.001;
-const double errBeta = 0.001;
 
 const char* particleNames[3] = {"Pi", "Proton", "Kaon"};
 const double particleMasses[3] = {0.1395701, 0.938272, 0.493677};
@@ -173,14 +172,13 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
   cout << "SINGLE EXAMPLE EVENT: Integrated number of photons in ring: " << nPhotons << endl;
   photonHist->SaveAs("./output/generatedEvent.root");
+  photonHist->Draw("colz");
   c1->SaveAs("./output/generatedEvent.pdf");
   return photonHist;
 }
 
 
-TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
-
+TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false) {
   // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   // Make Aerogel layer
@@ -207,9 +205,8 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   TBranch *paBranch = tree->Branch("particles",&paStruct.dirx,"dirx/D:diry:dirz:posx:posy:posz:id/i");
 
   // Make events and loop over them
-  beam->makeParticles(nEvents);
   for (int i = 0; i < nEvents; i++) {
-    Particle *pa = beam->getParticle(i);
+    Particle *pa = beam->generateParticle();
     paStruct.dirx = pa->dir0[0];
     paStruct.diry = pa->dir0[1];
     paStruct.dirz = pa->dir0[2];
@@ -265,8 +262,10 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
       delete ph;
     }
 
+    delete pa;
     // Project photons onto detector and plot distribution
     detector->projectPhotons(photonHist, rHist, photons);
+
   }
 
   // Scale photon histogram to the number of iterations
@@ -277,48 +276,48 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   photonHist->Scale(detector->getFillFactor());
   rHist->Scale(detector->getFillFactor());
 
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  auto duration = duration_cast<microseconds>( t2 - t1 ).count();
-  cout << "Time taken: " << duration / 1000000. << endl;
 
   // Draw out photon histogram and ellipse outline
-  TCanvas *c1 = new TCanvas("c1","c1",900,900);
-  c1->cd();
-  TPad *center_pad = new TPad("center_pad", "center_pad",0.0,0.0,0.6,0.6);
-  center_pad->Draw();
-  TPad *right_pad = new TPad("right_pad", "right_pad",0.55,0.0,1.0,0.6);
-  right_pad->Draw();
-  TPad *top_pad = new TPad("top_pad", "top_pad",0.0,0.55,0.6,1.0);
-  top_pad->Draw();
+  if (save) {
+    TCanvas *c1 = new TCanvas("c1","c1",900,900);
+    c1->cd();
+    TPad *center_pad = new TPad("center_pad", "center_pad",0.0,0.0,0.6,0.6);
+    center_pad->Draw();
+    TPad *right_pad = new TPad("right_pad", "right_pad",0.55,0.0,1.0,0.6);
+    right_pad->Draw();
+    TPad *top_pad = new TPad("top_pad", "top_pad",0.0,0.55,0.6,1.0);
+    top_pad->Draw();
 
-  TPad *corner_pad = new TPad("corner_pad", "corner_pad",0.55,0.55,1.0,1.0);
-  corner_pad->Draw();
+    TPad *corner_pad = new TPad("corner_pad", "corner_pad",0.55,0.55,1.0,1.0);
+    corner_pad->Draw();
 
-  center_pad->cd();
-  center_pad->SetGrid(1);
-  photonHist->Draw("colz");
+    center_pad->cd();
+    center_pad->SetGrid(1);
+    photonHist->Draw("colz");
 
-  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, center_pad, aerogel2);
-  cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
+    double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, center_pad, aerogel2);
+    cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
 
-  right_pad->cd();
-  right_pad->SetGrid(1);
-  photonHist->ProjectionY()->Draw("HIST");
+    right_pad->cd();
+    right_pad->SetGrid(1);
+    photonHist->ProjectionY()->Draw("HIST");
 
-  top_pad->cd();
-  top_pad->SetGrid(1);
-  photonHist->ProjectionX()->Draw("HIST");
+    top_pad->cd();
+    top_pad->SetGrid(1);
+    photonHist->ProjectionX()->Draw("HIST");
 
-  corner_pad->cd();
-  corner_pad->SetGrid(1);
-  rHist->Draw("bar");
+    corner_pad->cd();
+    corner_pad->SetGrid(1);
+    rHist->Draw("bar");
 
 
-  c1->SaveAs("./output/photonHistWithProjections.root");
-  rHist->SaveAs("./output/rHist.root");
-  photonHist->SaveAs("./output/photonHist.root");
+    c1->SaveAs("./output/photonHistWithProjections.root");
+    rHist->SaveAs("./output/rHist.root");
+    photonHist->SaveAs("./output/photonHist.root");
 
-  f->Write();
+    f->Write();
+  }
+
   return photonHist;
 }
 
@@ -333,31 +332,40 @@ double computeLogLikelihood(TH2D* event, TH2D* distribution) {
         double lambda = distribution->GetBinContent(i);
         bool pixelHit = event->GetBinContent(i) > 0;
         if (pixelHit) {
-            logLikelihood += log(exp(-lambda));
+          logLikelihood += log(1 - exp(-lambda));
         } else {
-            logLikelihood += log(1 - exp(-lambda));
+          logLikelihood += log(exp(-lambda));
         }
     }
-    return logLikelihood;
+    return -2*logLikelihood;
 }
 
 
-void particleID(int particlei, double particleMom, TVector3 pos0, TVector3 dir0) {
+void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
   // Given particle, momentum, simulate example event
-  // Assume centered for now
-  double beta = calcBeta(particlei, particleMom);
-  TH2D* generatedEvent = generateEvent(pos0, dir0, beta);
-  for (int i = 0; i < 3; i++) {
-    double beta0 = calcBeta(i, particleMom);
+  double realBeta = calcBeta(particlei, particleMom);
+  cout << "Real Beta: " << realBeta << endl;
+  TH2D* generatedEvent = generateEvent(pos0, dir0, realBeta);
+  cout << endl;
+
+  vector<double> betas;
+  vector<double> loglikes;
+  for (int particleId = 0; particleId < 3; particleId++) {
     // calculate within 2 standard deviations of each particle hypothesis
+    cout << "Guess: " << particleNames[particleId] << endl;
     for (int i = -2; i < 3; i++) {
-      TH2D *calculatedPdf = calculatePdf(pos0, dir0, beta + i*errBeta);
+      double betaGuess = calcBeta(particleId, particleMom + i*errMom);
+      cout << "Beta: " << betaGuess << endl;
+      TH2D *calculatedPdf = calculatePdf(pos0, dir0, betaGuess);
+      double logLikelihood = computeLogLikelihood(generatedEvent, calculatedPdf);
+      cout << "logLikelihood: " << logLikelihood << endl << endl;
+      betas.push_back(betaGuess);
+      loglikes.push_back(logLikelihood);
     }
   }
 }
 
 
-//int mainCalculatePdf(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
   if (argc == 1) {
     cerr << "Usage: " << argv[0] << endl
@@ -400,6 +408,8 @@ int main(int argc, char *argv[]) {
   cout << "Y Pos: " << y_0 << endl;
 
   // Do the thing
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
   if (mode == "-g") {
     // Given particle and momentum, simulate centered beam à la Geant4
     beta = calcBeta(particlei, particleMom);
@@ -413,9 +423,15 @@ int main(int argc, char *argv[]) {
 
   if (mode == "-b") {
     calculatePdf(pos0, dir0, beta);
+
   }
 
   if (mode == "-p") {
-    particleID(particlei, particleMom, pos0,  dir0);
+    identifyParticle(particlei, particleMom, pos0,  dir0);
   }
+
+  high_resolution_clock::time_point t2 = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>( t2 - t1 ).count();
+  cout << "Time taken: " << duration / 1000000. << endl;
+
 }
