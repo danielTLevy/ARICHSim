@@ -5,8 +5,9 @@
 #include <TStyle.h>
 #include "TMath.h"
 #include "TF1.h"
-#include "TH2D.h"
 #include "TH1D.h"
+#include "TH2D.h"
+#include "TH3D.h"
 #include "TFile.h"
 #include "TTree.h"
 #include "TTreeReader.h"
@@ -345,9 +346,9 @@ double computeLogLikelihood(TH2D* event, TH2D* distribution) {
 }
 
 
-TH2D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
-  TH2D* kapiHist = new TH2D("kapiHist", "kapiHist", 500., 200., 400., 500., 200., 400);
-  TH1D* sepHist = new TH1D("sepHist", "sepHist", 100, -50., 50.);
+TH3D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
+  TH3D* particleLogLikes = new TH3D("loglikes", "loglikes", 250, 100., 600., 250, 100., 600., 250, 100., 600.);
+  TH2D* sepHist = new TH2D("sepHist", "sepHist", 300, -150., 150., 300, -150., 150.);
   // Generate PDFs for pion and kaon hypotheses
   double piBeta = calcBeta(0, particleMom);
   TH2D *piPdf = calculatePdf(pos0, dir0, piBeta);
@@ -365,6 +366,16 @@ TH2D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVec
   cka->cd();
   kaPdf->Draw("colz");
   cka->SaveAs("./output/septest/kaHist.pdf");
+
+
+  double pBeta = calcBeta(2, particleMom);
+  TH2D *pPdf = calculatePdf(pos0, dir0, pBeta);
+  pPdf->SetName("protonPDF");
+  pPdf->SetTitle("Proton PDF");
+  TCanvas* cp = new TCanvas();
+  cp->cd();
+  pPdf->Draw("colz");
+  cp->SaveAs("./output/septest/pHist.pdf");
 
   // Prepare values to update in our loop
   TTreeReader reader("h1000", g4File);
@@ -387,9 +398,10 @@ TH2D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVec
       if (*raEvent != currEventId) {
         double pionLikelihood = computeLogLikelihood(g4EventHist, piPdf);
         double kaonLikelihood = computeLogLikelihood(g4EventHist, kaPdf);
-        kapiHist->Fill(pionLikelihood, kaonLikelihood);
-        sepHist->Fill(pionLikelihood - kaonLikelihood);
-        cout << pionLikelihood << "\t\t" << kaonLikelihood << endl;
+        double protonLikelihood = computeLogLikelihood(g4EventHist, pPdf);
+
+        particleLogLikes->Fill(pionLikelihood, kaonLikelihood, protonLikelihood);
+        sepHist->Fill(pionLikelihood - kaonLikelihood, kaonLikelihood - protonLikelihood);
         g4EventHist->Reset();
         currEventId = *raEvent;
         // Check one of them out
@@ -413,9 +425,9 @@ TH2D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVec
         g4EventHist->Fill(xFinal, yFinal);
       }
   }
-  sepHist->SaveAs("./output/septest/sepHist.root");
-  kapiHist->SaveAs("./output/septest/kaonpionloglike.root");
-  return kapiHist;
+  sepHist->SaveAs("./output/septest/logLikeRatios.root");
+  particleLogLikes->SaveAs("./output/septest/particleLogLikes.root");
+  return particleLogLikes;
 }
 
 
