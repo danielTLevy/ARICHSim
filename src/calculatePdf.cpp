@@ -37,13 +37,13 @@ const double width = 10.; // x width of aerogel
 const double height = 10.; // y height of aerogel
 const double n1 = 1.0352; // outer index of refraction
 const double n2 = 1.0452; // inner index of refraction
-const double dist = 21.0; // dist to detector plane
+const double detectorDist = 21.0; // dist to detector plane
 const double errDirX = 0.000; // beam direction error
 const double errDirY = 0.000;
 const double errX = 0.001; // beam position error
 const double errY = 0.001;
 
-const char* particleNames[3] = {"Pi", "Kaon", "Proton" };
+const char* particleNames[3] = {"Pion", "Kaon", "Proton" };
 const double particleMasses[3] = {0.1395701, 0.493677, 0.938272};
 
 struct photonStruct {
@@ -94,7 +94,7 @@ double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* 
   double middlePoint = thickness + thickness / 2.;
   double newX_0 = pos0[0] + middlePoint*dirX_0/dirZ_0;
   double newY_0 = pos0[1] + middlePoint*dirY_0/dirZ_0;
-  double newDist = dist - middlePoint;
+  double newDist = detectorDist - middlePoint;
   double dirTheta =  atan(sqrt(dirX_0*dirX_0 +dirY_0*dirY_0) / dirZ_0);
   double chAngle = aerogel->getChAngle();
   // Calculate ellipse parameters
@@ -147,7 +147,7 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
   // Make the detector
-  Detector* detector = new Detector(dist);
+  Detector* detector = new Detector(detectorDist);
   // Make photons in first aerogel
   std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
   aerogel1->applyPhotonScatters(photons);
@@ -180,6 +180,36 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   return photonHist;
 }
 
+TH2D* geant4Pdf(TFile* g4File, int particlei) {
+  const char* particle = particleNames[particlei];
+  char* filename = Form("%sG4Pdf", particle);
+  // Prepare values to update in our loop
+  TTreeReader reader("h1000", g4File);
+  TTreeReaderValue<Int_t> raPid(reader, "Pid");
+  TTreeReaderArray<Double_t> raMom(reader, "Mom");
+  TTreeReaderArray<Double_t> raPos(reader, "Pos");
+  TTreeReaderArray<Double_t> raDir(reader, "Dir");
+  Detector* detector = new Detector(0);
+  TH2D *allEventHist = new TH2D(filename, filename,48,-15,15,48,-15,15);
+  double fillFactor = 0.8*0.87;
+  while (reader.Next()) {
+      // Get only forward-exiting optical photons
+      if (*raPid != 0 || raPos[2] < 829.99) {
+          continue;
+      }
+      // Momentum in GeV/c:
+      Double_t mom = sqrt(raMom[0]*raMom[0] + raMom[1]*raMom[1] + raMom[2]*raMom[2]);
+      // Wavelength in m (multiply by c and planck's constant in eV*s)
+      Double_t wav = 2.99792458E8 * 4.135667662E-15 / (1E9 * mom);
+      Double_t efficiency = fillFactor * detector->evalQEff(wav);
+        // Project onto detector, and convert from mm to cm
+      Double_t xFinal = 0.1*(raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2]);
+      Double_t yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
+      allEventHist->Fill(xFinal, yFinal, efficiency/10000.);
+  }
+
+  allEventHist->SaveAs(Form("./output/g4separation/%s.root", filename));
+}
 
 TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false) {
   // Make beam
@@ -191,7 +221,7 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false)
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
   // Make the detector
-  Detector* detector = new Detector(dist);
+  Detector* detector = new Detector(detectorDist);
 
 
   // Get plots ready
@@ -240,7 +270,11 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false)
     aerogel1->exitAerogel(photons, true);
     aerogel2->applyPhotonScatters(photons);
     aerogel2->exitAerogel(photons, true);
-    // Save photons to TTree
+
+    // Project photons onto detector and plot distribution
+    detector->projectPhotons(photonHist, rHist, photons);
+
+    // Save photons to TTree and delete
     for (int j = 0; j < photons.size(); j++) {
       Photon* ph = photons[j];
       phStruct.paid = i;
@@ -264,11 +298,7 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false)
       tree->Fill();
       delete ph;
     }
-
     delete pa;
-    // Project photons onto detector and plot distribution
-    detector->projectPhotons(photonHist, rHist, photons);
-
   }
 
   // Scale photon histogram to the number of iterations
@@ -346,36 +376,58 @@ double computeLogLikelihood(TH2D* event, TH2D* distribution) {
 }
 
 
-TH3D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
+TH3D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVector3 pos0, TVector3 dir0, bool g4 = false) {
+  // Read gean4 TTree file to produce a load of event histograms, and check each against some particle hypothesis PDFs
+
   TH3D* particleLogLikes = new TH3D("loglikes", "loglikes", 250, 100., 600., 250, 100., 600., 250, 100., 600.);
-  TH2D* sepHist = new TH2D("sepHist", "sepHist", 300, -150., 150., 300, -150., 150.);
-  // Generate PDFs for pion and kaon hypotheses
-  double piBeta = calcBeta(0, particleMom);
-  TH2D *piPdf = calculatePdf(pos0, dir0, piBeta);
-  piPdf->SetName("pionPDF");
-  piPdf->SetTitle("Pion PDF");
-  TCanvas* cpi = new TCanvas();
-  piPdf->Draw("colz");
-  cpi->SaveAs("./output/septest/piHist.pdf");
+  particleLogLikes->SetXTitle("Pion");
+  particleLogLikes->SetYTitle("Kaon");
+  particleLogLikes->SetZTitle("Proton");
 
-  double kaBeta = calcBeta(1, particleMom);
-  TH2D *kaPdf = calculatePdf(pos0, dir0, kaBeta);
-  kaPdf->SetName("kaonPDF");
-  kaPdf->SetTitle("Kaon PDF");
-  TCanvas* cka = new TCanvas();
-  cka->cd();
-  kaPdf->Draw("colz");
-  cka->SaveAs("./output/septest/kaHist.pdf");
+  TH3D* logLikeRatios = new TH3D("logLikeRatios", "logLikeRatios", 300, -150., 150., 300, -150., 150., 300, -150., 150.);
+  logLikeRatios->SetXTitle("Pion/Kaon");
+  logLikeRatios->SetYTitle("Kaon/Proton");
+  logLikeRatios->SetZTitle("Pion/Proton");
+
+  TH2D* piPdf=nullptr;
+  TH2D* kaPdf=nullptr;
+  TH2D* pPdf=nullptr;
+  if (!g4) {
+      // Generate PDFs for pion and kaon hypotheses
+    double piBeta = calcBeta(0, particleMom);
+    piPdf = calculatePdf(pos0, dir0, piBeta);
+    piPdf->SetName("pionPDF");
+    piPdf->SetTitle("Pion PDF");
+    TCanvas* cpi = new TCanvas();
+    piPdf->Draw("colz");
+    cpi->SaveAs("./output/septest/piHist.pdf");
+    piPdf->SaveAs("./output/septest/piHist.root");
 
 
-  double pBeta = calcBeta(2, particleMom);
-  TH2D *pPdf = calculatePdf(pos0, dir0, pBeta);
-  pPdf->SetName("protonPDF");
-  pPdf->SetTitle("Proton PDF");
-  TCanvas* cp = new TCanvas();
-  cp->cd();
-  pPdf->Draw("colz");
-  cp->SaveAs("./output/septest/pHist.pdf");
+    double kaBeta = calcBeta(1, particleMom);
+    kaPdf = calculatePdf(pos0, dir0, kaBeta);
+    kaPdf->SetName("kaonPDF");
+    kaPdf->SetTitle("Kaon PDF");
+    TCanvas* cka = new TCanvas();
+    cka->cd();
+    kaPdf->Draw("colz");
+    cka->SaveAs("./output/septest/kaHist.pdf");
+
+
+    double pBeta = calcBeta(2, particleMom);
+    pPdf = calculatePdf(pos0, dir0, pBeta);
+    pPdf->SetName("protonPDF");
+    pPdf->SetTitle("Proton PDF");
+    TCanvas* cp = new TCanvas();
+    cp->cd();
+    pPdf->Draw("colz");
+    cp->SaveAs("./output/septest/pHist.pdf");
+  } else {
+    piPdf = (TH2D*) TFile::Open("./output/g4separation/PionG4Pdf.root")->Get("PionG4Pdf");
+    kaPdf = (TH2D*) TFile::Open("./output/g4separation/KaonG4Pdf.root")->Get("KaonG4Pdf");
+    pPdf =  (TH2D*) TFile::Open("./output/g4separation/ProtonG4Pdf.root")->Get("ProtonG4Pdf");
+  }
+
 
   // Prepare values to update in our loop
   TTreeReader reader("h1000", g4File);
@@ -387,6 +439,8 @@ TH3D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVec
   TRandom3 randomGen = TRandom3();
   Detector* detector = new Detector(0);
   TH2D *g4EventHist = new TH2D("g4EventHist","g4EventHist",48,-15,15,48,-15,15);
+  TH2D *allEventHist = new TH2D("allEventHist","allEventHist",48,-15,15,48,-15,15);
+
   int currEventId = 0;
   double fillFactor = 0.8*0.87;
   while (reader.Next()) {
@@ -399,18 +453,17 @@ TH3D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVec
         double pionLikelihood = computeLogLikelihood(g4EventHist, piPdf);
         double kaonLikelihood = computeLogLikelihood(g4EventHist, kaPdf);
         double protonLikelihood = computeLogLikelihood(g4EventHist, pPdf);
-
         particleLogLikes->Fill(pionLikelihood, kaonLikelihood, protonLikelihood);
-        sepHist->Fill(pionLikelihood - kaonLikelihood, kaonLikelihood - protonLikelihood);
-        g4EventHist->Reset();
-        currEventId = *raEvent;
+        logLikeRatios->Fill(pionLikelihood - kaonLikelihood, kaonLikelihood - protonLikelihood, pionLikelihood - protonLikelihood);
         // Check one of them out
-        if (*raEvent == 100) {
+        if (*raEvent == 99) {
           TCanvas* cg4 = new TCanvas();
           cg4->cd();
           g4EventHist->Draw("colz");
           cg4->SaveAs("./output/septest/exampleG4Event.pdf");
         }
+        g4EventHist->Reset();
+        currEventId = *raEvent;
       }
       // Create our event histograms:
       // Momentum in GeV/c:
@@ -423,13 +476,17 @@ TH3D* calculateSeparation(TFile* g4File, int particlei, double particleMom, TVec
         Double_t xFinal = 0.1*(raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2]);
         Double_t yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
         g4EventHist->Fill(xFinal, yFinal);
+        allEventHist->Fill(xFinal, yFinal);
       }
   }
-  sepHist->SaveAs("./output/septest/logLikeRatios.root");
+  logLikeRatios->SaveAs("./output/septest/logLikeRatios.root");
   particleLogLikes->SaveAs("./output/septest/particleLogLikes.root");
+  TCanvas* cAllEvents = new TCanvas();
+  cAllEvents->cd();
+  allEventHist->Draw("colz");
+  cAllEvents->SaveAs("./output/septest/allG4Events.pdf");
   return particleLogLikes;
 }
-
 
 void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
   // Given particle, momentum, simulate example event
@@ -463,10 +520,10 @@ void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3
 int main(int argc, char *argv[]) {
   if (argc == 1) {
     cerr << "Usage: " << argv[0] << endl
-         << "Make distribution given Geant4 Params: -g <pid> <mom>" << endl
-         << "Make distribution given beam:          -b [beta xdir ydir xpos ypos]" << endl
+         << "Make pdf given particle and momentum:  -g <pid> <mom> [xdir ydir xpos ypos]" << endl
+         << "Make pdf given beta:                   -b [beta xdir ydir xpos ypos]" << endl
          << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl
-         << "Check particle separation:             -s <g4filename> <pid> <mom> [xdir ydir xpos ypos]" << endl;
+         << "Check particle separation:             -s <g4filename> <pid> <mom> [xdir ydir xpos ypos] [g4]" << endl;
 
     return -1;
   }
@@ -478,26 +535,27 @@ int main(int argc, char *argv[]) {
   dirX_0 = dirY_0 = x_0 = y_0 = 0;
   int particlei = 0;
   double particleMom = 0;
-  int argi = 2;
   TFile *g4File = nullptr;
+  bool g4 = false;
 
-  if (mode == "-s") {
+  int argi = 2;
+
+  if (mode == "-s" || mode == "-gpdf") {
     g4File = TFile::Open(argv[argi]);
     argi = argi + 1;
   }
-  if (mode ==  "-g" || mode == "-p" || mode == "-s") {
+  if (mode ==  "-g" || mode == "-p" || mode == "-s" || mode == "-gpdf") {
     particlei = atoi(argv[argi]);
     particleMom = atof(argv[argi+1]);
     cout << "Particle: " << particleNames[particlei] << endl;
     cout << "Momentum: " << particleMom << " GeV" << endl;
     argi = argi + 2;
-
   }
   if (mode == "-b" && argc > 2) {
     beta = atof(argv[argi]);
     argi = argi + 1;
   }
-  if (argc >= argi + 2) {
+  if (argc >= argi + 1) {
     dirX_0 = atof(argv[argi]);
     dirY_0 = atof(argv[argi + 1]);
     argi = argi + 2;
@@ -505,26 +563,27 @@ int main(int argc, char *argv[]) {
   if (argc >= argi + 1) {
     x_0 = atof(argv[argi]);
     y_0 = atof(argv[argi + 1]);
+    argi = argi + 2;
   }
   cout << "X Dir: " << dirX_0 << endl;
   cout << "Y Dir: " << dirY_0 << endl;
   cout << "X Pos: " << x_0 << endl;
   cout << "Y Pos: " << y_0 << endl;
 
-  // Do the thing
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-  if (mode == "-g") {
-    // Given particle and momentum, simulate centered beam à la Geant4
-    beta = calcBeta(particlei, particleMom);
-    cout << "Beta: " << beta << endl;
-    calculatePdf(TVector3(0.,0.,0.), TVector3(0.,0.,1.), beta);
-  }
 
   double dirZ_0 = sqrt(1. - dirX_0*dirX_0 - dirY_0*dirY_0);
   TVector3 pos0 = TVector3(x_0, y_0, 0);
   TVector3 dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();
 
+  // Do the thing
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+  if (mode == "-g") {
+    // Given particle and momentum, simulate centered beam à la Geant4
+    beta = calcBeta(particlei, particleMom);
+    cout << "Beta: " << beta << endl;
+    calculatePdf(pos0, dir0, beta, true);
+  }
   if (mode == "-b") {
     calculatePdf(pos0, dir0, beta, true);
   }
@@ -534,7 +593,14 @@ int main(int argc, char *argv[]) {
   }
 
   if (mode == "-s") {
-    calculateSeparation(g4File, particlei, particleMom, pos0, dir0);
+    if (argc >= argi) {
+      g4 = argv[argi];
+    }
+    calculateSeparation(g4File, particlei, particleMom, pos0, dir0, g4);
+  }
+
+  if (mode == "-gpdf") {
+    geant4Pdf(g4File, particlei);
   }
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
