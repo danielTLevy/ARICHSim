@@ -43,7 +43,7 @@ const double errDirY = 0.000;
 const double errX = 0.001; // beam position error
 const double errY = 0.001;
 
-const char* particleNames[3] = {"Pion", "Kaon", "Proton"};
+const char* pNames[3] = {"Pion", "Kaon", "Proton"};
 const int NUMPARTICLES = 3;
 const double particleMasses[3] = {0.1395701, 0.493677, 0.938272};
 const double PLANCKSCONST = 4.135667662E-15;
@@ -139,7 +139,6 @@ double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* 
   return outerCut->IntegralHist(photonHist) - innerCut->IntegralHist(photonHist);
 }
 
-
 TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   // Generate a single particle event
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
@@ -185,7 +184,7 @@ TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
 }
 
 TH2D* geant4Pdf(TFile* g4File, int particlei) {
-  const char* particle = particleNames[particlei];
+  const char* particle = pNames[particlei];
   char* filename = Form("%sG4Pdf", particle);
   // Prepare values to update in our loop
   TTreeReader reader("h1000", g4File);
@@ -391,7 +390,6 @@ double computeLogLikelihood(TH2D* event, TH2D* distribution) {
   return -2*logLikelihood;
 }
 
-
 void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char* analysisDir) {
   /*
   Compare each particle geant4 root file to a different simulated particle PDF
@@ -403,7 +401,7 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
   // First generate 3 particle hypothesis
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
-    char* namei = (char*) particleNames[i];
+    char* namei = (char*) pNames[i];
     double massi = particleMasses[i];
     double betai = calcBeta(i, particleMom);
     TH2D* particleiPdf = calculatePdf(pos0, dir0, betai);
@@ -420,12 +418,15 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
   for (int j = 0; j < NUMPARTICLES; j++) {
     for (int i = 0; i < NUMPARTICLES; i++) {
       if (i != j) {
-        char* ratioHistName = Form("%s%sRatio%s", (char*)particleNames[max(i,j)],
-                                                  (char*)particleNames[min(i,j)],
-                                                  (char*)particleNames[j]);
         // Ratio of particle likelihoods for max(i,j) to min(i,j) for a given particle j
         // max and min are used so that the ratio is consistent for both particle types looked at
-        likelihoodRatios[i][j] = new TH1D(ratioHistName, ratioHistName, 300, -150, 150);
+        char* ratioName = Form("%s/%s Ratio", (char*)pNames[max(i,j)],
+                                              (char*)pNames[min(i,j)]);
+        char* histName = Form("%s%s ", ratioName, (char*) pNames[j]);
+        char* histTitle = Form("%s, %ss", ratioName, (char*) pNames[j]);
+        likelihoodRatios[i][j] = new TH1D(histName, histTitle, 300, -150, 150);
+        likelihoodRatios[i][j]->SetXTitle(ratioName);
+        likelihoodRatios[i][j]->SetYTitle("Count");
       }
     }
   }
@@ -435,7 +436,7 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
   for (int j = 0; j < NUMPARTICLES; j++) {
     // For each particle type, run through the whole geant4-generated ttree.
     g4EventHist->Reset();
-    char* namej = (char*) particleNames[j];
+    char* namej = (char*) pNames[j];
     cout << "Checking likelihoods for " << namej << endl;
     double massj = particleMasses[j];
     double betaj = calcBeta(j, particleMom);
@@ -488,11 +489,18 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
     for (int i = 0; i < NUMPARTICLES; i++) {
       if (i != j) {
         likelihoodRatios[i][j]->Write();
+        if (i > j) {
+          cout << pNames[i] << "-" << pNames[j] << " separation: ";
+          double deltaMean = likelihoodRatios[i][j]->GetMean() - likelihoodRatios[j][i]->GetMean();
+          double width = sqrt(TMath::Power(likelihoodRatios[i][j]->GetRMS(),2) +
+                            TMath::Power(likelihoodRatios[j][i]->GetRMS(),2));
+          cout << deltaMean / width << endl;
+        }
       }
     }
   }
-}
 
+}
 
 void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
   // Given particle, momentum, simulate example event
@@ -505,7 +513,7 @@ void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3
   vector<double> loglikes;
   for (int particleId = 0; particleId < 3; particleId++) {
     // calculate within 2 standard deviations of each particle hypothesis
-    cout << "Guess: " << particleNames[particleId] << endl;
+    cout << "Guess: " << pNames[particleId] << endl;
     for (int i = -2; i < 3; i++) {
       double betaGuess = calcBeta(particleId, particleMom + i*errMom);
       cout << "Beta: " << betaGuess << endl;
@@ -558,7 +566,7 @@ int main(int argc, char *argv[]) {
   }
   if (mode ==  "-g" || mode == "-p" || mode == "-gpdf") {
     particlei = atoi(argv[argi]);
-    cout << "Particle: " << particleNames[particlei] << endl;
+    cout << "Particle: " << pNames[particlei] << endl;
     argi = argi + 1;
   }
   if (mode ==  "-g" || mode == "-p" || mode == "-s" || mode == "-gpdf" || mode == "-sd") {
