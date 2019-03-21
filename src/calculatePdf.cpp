@@ -214,7 +214,63 @@ TH2D* geant4Pdf(TFile* g4File, int particlei) {
   allEventHist->SaveAs(Form("./output/geant4pdfs/%s.root", filename));
 }
 
-TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false) {
+TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
+  // Make beam
+  Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
+  // Make Aerogel layer
+  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
+  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
+  // Make them aware of each other for refraction purposes
+  aerogel1->setDownIndex(n2);
+  aerogel2->setUpIndex(n1);
+  // Make the detector
+  Detector* detector = new Detector(detectorDist);
+  // Get hist ready
+  TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
+  // Make events and loop over them
+  for (int i = 0; i < nEvents; i++) {
+    Particle *pa = beam->generateParticle();
+    // Make photons in first aerogel
+    std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
+    // Advance particle forward to next aerogel and generate photons
+    pa->travelZDist(aeroPos[1] - aeroPos[0]);
+    std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
+    // Scatter photons in first aerogel, move them forwards out of aerogel
+    aerogel1->applyPhotonScatters(photons);
+    aerogel1->exitAerogel(photons, true);
+    // Combine photons from both aerogels
+    photons.insert(photons.end(), photons2.begin(), photons2.end());
+    // Include scattering in second aerogel
+    aerogel2->applyPhotonScatters(photons);
+    aerogel2->exitAerogel(photons, true);
+    // Do some more scattering
+    aerogel1->applyPhotonScatters(photons);
+    aerogel1->exitAerogel(photons, true);
+    aerogel2->applyPhotonScatters(photons);
+    aerogel2->exitAerogel(photons, true);
+    // Project photons onto detector and plot distribution
+    detector->projectPhotons(photonHist, photons);
+    // delete
+    for (int j = 0; j < photons.size(); j++) {
+      Photon* ph = photons[j];
+      delete ph;
+    }
+    delete pa;
+  }
+
+  // Scale photon histogram to the number of iterations
+  photonHist->Scale(1. / nEvents);
+  // Scale photon to fill factor of detector
+  photonHist->Scale(detector->getFillFactor());
+  delete beam;
+  delete aerogel1;
+  delete aerogel2;
+  delete detector;
+  return photonHist;
+}
+
+
+TH2D* simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   // Make Aerogel layer
@@ -226,9 +282,10 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false)
   // Make the detector
   Detector* detector = new Detector(detectorDist);
 
-
   // Get plots ready
   TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
+  photonHist->SetXTitle("x [cm]");
+  photonHist->SetYTitle("y [cm]");
   TH1D *rHist = new TH1D("rHist", "rHist", 500, 0., 10.);
 
   // Make a tree to save the photons
@@ -313,58 +370,56 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false)
   rHist->Scale(detector->getFillFactor());
 
   // Draw out photon histogram and ellipse outline
-  if (save) {
-    gStyle->SetOptStat(0);
-    TCanvas *c1 = new TCanvas("c1","c1",900,900);
-    c1->cd();
-    TPad *center_pad = new TPad("center_pad", "center_pad",0.0,0.0,0.55,0.55);
-    center_pad->Draw();
-    TPad *right_pad = new TPad("right_pad", "right_pad",0.55,0.0,1.0,0.6);
-    right_pad->Draw();
-    TPad *top_pad = new TPad("top_pad", "top_pad",0.0,0.55,0.6,1.0);
-    top_pad->Draw();
+  gStyle->SetOptStat(0);
+  TCanvas *c1 = new TCanvas("c1","c1",900,900);
+  c1->cd();
+  TPad *center_pad = new TPad("center_pad", "center_pad",0.0,0.0,0.55,0.55);
+  center_pad->Draw();
+  TPad *right_pad = new TPad("right_pad", "right_pad",0.55,0.0,1.0,0.6);
+  right_pad->Draw();
+  TPad *top_pad = new TPad("top_pad", "top_pad",0.0,0.55,0.6,1.0);
+  top_pad->Draw();
 
-    TPad *corner_pad = new TPad("corner_pad", "corner_pad",0.55,0.55,1.0,1.0);
-    corner_pad->Draw();
+  TPad *corner_pad = new TPad("corner_pad", "corner_pad",0.55,0.55,1.0,1.0);
+  corner_pad->Draw();
 
-    center_pad->cd();
-    center_pad->SetGrid(1);
-    photonHist->SetTitle("");
-    photonHist->SetXTitle("x [cm]");
-    photonHist->SetYTitle("y [cm]");
-    photonHist->SetZTitle("Mean Photon Count");
-    photonHist->Draw("colz");
+  center_pad->cd();
+  center_pad->SetGrid(1);
+  photonHist->SetTitle("");
+  photonHist->SetZTitle("Mean Photon Count");
+  photonHist->Draw("colz");
 
-    double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, center_pad, aerogel2);
-    cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
+  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, center_pad, aerogel2);
+  cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
 
-    right_pad->cd();
-    right_pad->SetGrid(1);
-    TH1D* yProj = (TH1D*) photonHist->ProjectionY()->Clone("yProj");
-    yProj->SetYTitle("y [cm]");
-    yProj->Draw("hbar");
+  right_pad->cd();
+  right_pad->SetGrid(1);
+  TH1D* yProj = (TH1D*) photonHist->ProjectionY()->Clone("yProj");
+  yProj->SetYTitle("y [cm]");
+  yProj->Draw("hbar");
 
-    top_pad->cd();
-    top_pad->SetGrid(1);
-    TH1D* xProj = (TH1D*) photonHist->ProjectionY()->Clone("xProj");
-    xProj->SetYTitle("x [cm]");
+  top_pad->cd();
+  top_pad->SetGrid(1);
+  TH1D* xProj = (TH1D*) photonHist->ProjectionY()->Clone("xProj");
+  xProj->SetYTitle("x [cm]");
 
-    xProj->Draw("bar");
+  xProj->Draw("bar");
 
-    corner_pad->cd();
-    corner_pad->SetGrid(1);
-    rHist->SetTitle("");
-    rHist->SetXTitle("Distance from origin [cm]");
-    rHist->Draw("bar");
+  corner_pad->cd();
+  corner_pad->SetGrid(1);
+  rHist->SetTitle("");
+  rHist->SetXTitle("Distance from origin [cm]");
+  rHist->Draw("bar");
 
 
-    c1->SaveAs("./output/photonHistWithProjections.root");
-    c1->SaveAs("./output/photonHistWithProjections.pdf");
-    rHist->SaveAs("./output/rHist.root");
-    photonHist->SaveAs("./output/photonHist.root");
+  c1->SaveAs("./output/photonHistWithProjections.root");
+  c1->SaveAs("./output/photonHistWithProjections.pdf");
+  rHist->SaveAs("./output/rHist.root");
+  photonHist->SaveAs("./output/photonHist.root");
 
-    f->Write();
-  }
+  f->Write();
+
+  delete beam;
   delete aerogel1;
   delete aerogel2;
   delete detector;
@@ -375,7 +430,8 @@ TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, bool save = false)
 double computeLogLikelihood(TH2D* event, TH2D* distribution) {
   int nBins = event->GetSize();
   if (nBins != distribution->GetSize()) {
-      throw "Error: Bin Mismatch";
+      cerr << "ERROR: Bin Mismatch" << endl;
+      throw "Bin Mismatch Error";
   }
   double logLikelihood = 0.;
   for (int i = 0; i < nBins; i++) {
@@ -408,11 +464,9 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
     particleiPdf->SetName(Form("%sPdf", namei));
     particleiPdf->SetTitle(Form("%s PDF", namei));
     particlePdfs[i] = particleiPdf;
-    TCanvas* pdfCanvas = new TCanvas();
-    particleiPdf->Draw("colz");
-    pdfCanvas->SaveAs(Form("./output/%s/%sPdfHist.pdf", analysisDir, namei));
-    delete pdfCanvas;
+    particleiPdf->SaveAs(Form("./output/%s/%sPdfHist.root", analysisDir, namei));
   }
+
   // Next, compare each of the 3 geant4 outputs to these 3 particle hypotheses
   TH1D* likelihoodRatios[NUMPARTICLES][NUMPARTICLES];
   for (int j = 0; j < NUMPARTICLES; j++) {
@@ -420,9 +474,12 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
       if (i != j) {
         // Ratio of particle likelihoods for max(i,j) to min(i,j) for a given particle j
         // max and min are used so that the ratio is consistent for both particle types looked at
+        char* histName = Form("%s%sRatio%s",
+                                (char*)pNames[max(i,j)],
+                                (char*)pNames[min(i,j)],
+                                (char*) pNames[j]);
         char* ratioName = Form("%s/%s Ratio", (char*)pNames[max(i,j)],
                                               (char*)pNames[min(i,j)]);
-        char* histName = Form("%s%s ", ratioName, (char*) pNames[j]);
         char* histTitle = Form("%s, %ss", ratioName, (char*) pNames[j]);
         likelihoodRatios[i][j] = new TH1D(histName, histTitle, 300, -150, 150);
         likelihoodRatios[i][j]->SetXTitle(ratioName);
@@ -441,6 +498,8 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
     double massj = particleMasses[j];
     double betaj = calcBeta(j, particleMom);
     TFile* g4File = TFile::Open(Form("./output/%s/g4/%s.root", analysisDir, namej));
+    char* g4PdfName = Form("g4%sPdf", namej);
+    TH2D *g4Pdf = new TH2D(g4PdfName,g4PdfName,48,-15,15,48,-15,15);
     // Prepare values to update in our loop
     TTreeReader reader("h1000", g4File);
     TTreeReaderValue<Int_t> rvEvent(reader, "EventNumber");
@@ -479,8 +538,10 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
         double xFinal = 0.1*(raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2]);
         double yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
         g4EventHist->Fill(xFinal, yFinal);
+        g4Pdf->Fill(xFinal, yFinal);
       }
     }
+    g4Pdf->SaveAs(Form("./output/%s/%s.root", analysisDir, g4PdfName));
   }
   // Save the output for each of the ratios.
   TFile *likelihoodFile = new TFile(Form("./output/%s/likelihoods.root", analysisDir), "RECREATE"); 
@@ -602,10 +663,10 @@ int main(int argc, char *argv[]) {
     // Given particle and momentum, simulate centered beam à la Geant4
     beta = calcBeta(particlei, particleMom);
     cout << "Beta: " << beta << endl;
-    calculatePdf(pos0, dir0, beta, true);
+    simulateBeam(pos0, dir0, beta);
   }
   if (mode == "-b") {
-    calculatePdf(pos0, dir0, beta, true);
+    simulateBeam(pos0, dir0, beta);
   }
 
   if (mode == "-p") {
