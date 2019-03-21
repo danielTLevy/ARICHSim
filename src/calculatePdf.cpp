@@ -551,11 +551,15 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
       if (i != j) {
         likelihoodRatios[i][j]->Write();
         if (i > j) {
-          cout << pNames[i] << "-" << pNames[j] << " separation: ";
+          cout << pNames[i] << "/" << pNames[j] << ": " << endl;
           double deltaMean = likelihoodRatios[i][j]->GetMean() - likelihoodRatios[j][i]->GetMean();
           double width = sqrt(TMath::Power(likelihoodRatios[i][j]->GetRMS(),2) +
                             TMath::Power(likelihoodRatios[j][i]->GetRMS(),2));
-          cout << deltaMean / width << endl;
+          cout << "\tseparation: " << deltaMean / width << endl;
+          double pctjMisidentified = 100.*likelihoodRatios[i][j]->Integral(0,   149)/9999.;
+          double pctiMisidentified = 100.*likelihoodRatios[j][i]->Integral(150, 300)/9999.;
+          cout << "\t" << pctiMisidentified << "% " << pNames[i] << "s Misidentified" << endl;
+          cout << "\t" << pctjMisidentified << "% " << pNames[j] << "s Misidentified" << endl;
         }
       }
     }
