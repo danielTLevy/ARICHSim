@@ -45,6 +45,9 @@ private:
   const double errX = 0.001; // beam position error
   const double errY = 0.001;
 
+  TVector3 pos0;
+  TVector3 dir0;
+
   struct photonStruct {
     // Initial direction and position
     double dirxi;
@@ -78,13 +81,13 @@ private:
     int id;
   };
 
-  double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel);
+  double integrateAndDrawEllipse(double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel);
 
 public:
-  Arich();
-  TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta);
-  TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta);
-  TH2D* simulateBeam(TVector3 pos0, TVector3 dir0, double beta);
+  Arich(TVector3 pos0, TVector3 dir0);
+  TH2D* calculatePdf(double beta);
+  TH2D* generateEvent(double beta);
+  TH2D* simulateBeam(double beta);
 };
 
 #endif

@@ -111,13 +111,13 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
   */
 
   // First generate 3 particle hypothesis
-  Arich * arich = new Arich();
+  Arich * arich = new Arich(pos0, dir0);
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
     char* namei = (char*) pNames[i];
     double massi = particleMasses[i];
     double betai = calcBeta(i, particleMom);
-    TH2D* particleiPdf = arich->calculatePdf(pos0, dir0, betai);
+    TH2D* particleiPdf = arich->calculatePdf(betai);
     particleiPdf->SetName(Form("%sPdf", namei));
     particleiPdf->SetTitle(Form("%s PDF", namei));
     particlePdfs[i] = particleiPdf;
@@ -213,24 +213,23 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
           double width = sqrt(TMath::Power(likelihoodRatios[i][j]->GetRMS(),2) +
                             TMath::Power(likelihoodRatios[j][i]->GetRMS(),2));
           cout << "\tseparation: " << deltaMean / width << endl;
-          double pctjMisidentified = 100.*likelihoodRatios[i][j]->Integral(0,   149)/9999.;
-          double pctiMisidentified = 100.*likelihoodRatios[j][i]->Integral(150, 300)/9999.;
+          double pctjMisidentified = 100.*likelihoodRatios[i][j]->Integral(0,   149)/likelihoodRatios[i][j]->GetSum();
+          double pctiMisidentified = 100.*likelihoodRatios[j][i]->Integral(150, 300)/likelihoodRatios[i][j]->GetSum();
           cout << "\t" << pctiMisidentified << "% " << pNames[i] << "s Misidentified" << endl;
           cout << "\t" << pctjMisidentified << "% " << pNames[j] << "s Misidentified" << endl;
         }
       }
     }
   }
-
 }
 
 
 void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
-  Arich * arich = new Arich();
+  Arich * arich = new Arich(pos0, dir0);
   // Given particle, momentum, simulate example event
   double realBeta = calcBeta(particlei, particleMom);
   cout << "Real Beta: " << realBeta << endl;
-  TH2D* generatedEvent = arich->generateEvent(pos0, dir0, realBeta);
+  TH2D* generatedEvent = arich->generateEvent(realBeta);
   cout << endl;
 
   vector<double> betas;
@@ -241,7 +240,7 @@ void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3
     for (int i = -2; i < 3; i++) {
       double betaGuess = calcBeta(particleId, particleMom + i*errMom);
       cout << "Beta: " << betaGuess << endl;
-      TH2D *calculatedPdf = arich->calculatePdf(pos0, dir0, betaGuess);
+      TH2D *calculatedPdf = arich->calculatePdf(betaGuess);
       double logLikelihood = computeLogLikelihood(generatedEvent, calculatedPdf);
       cout << "logLikelihood: " << logLikelihood << endl << endl;
       betas.push_back(betaGuess);
@@ -277,7 +276,6 @@ int main(int argc, char *argv[]) {
   TFile *g4File = nullptr;
   char* analysisDir;
   bool g4 = false;
-  Arich * arich = new Arich();
   int argi = 2;
 
   if (mode == "-gpdf") {
@@ -322,14 +320,14 @@ int main(int argc, char *argv[]) {
 
   // Do the thing
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  if (mode == "-g") {
+  if (mode == "-g" || mode == "-b") {
     // Given particle and momentum, simulate centered beam à la Geant4
-    beta = calcBeta(particlei, particleMom);
-    cout << "Beta: " << beta << endl;
-    arich->simulateBeam(pos0, dir0, beta);
-  }
-  if (mode == "-b") {
-    arich->simulateBeam(pos0, dir0, beta);
+    if (mode == "-g") {
+      beta = calcBeta(particlei, particleMom);
+      cout << "Beta: " << beta << endl;
+    }
+    Arich* arich = new Arich(pos0, dir0);
+    arich->simulateBeam(beta);
   }
 
   if (mode == "-p") {

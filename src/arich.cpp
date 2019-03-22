@@ -1,12 +1,12 @@
 #include "arich.h"
 using namespace std;
 
-Arich::Arich() {
-  
+Arich::Arich(TVector3 pos0, TVector3 dir0) {
+  this->pos0 = pos0;
+  this->dir0 = dir0;
 }
 
-
-double Arich::integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel) {
+double Arich::integrateAndDrawEllipse(double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel) {
   // Define Ellipse and integrate over this ring
   double dirX_0 = dir0[0];
   double dirY_0 = dir0[1];
@@ -59,7 +59,7 @@ double Arich::integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta,
 
 
 
-TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
+TH2D* Arich::calculatePdf(double beta) {
   // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   // Make Aerogel layer
@@ -114,7 +114,7 @@ TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   return photonHist;
 }
 
-TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
+TH2D* Arich::generateEvent(double beta) {
   // Generate a single particle event
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   Particle *pa = beam->generateParticle();
@@ -150,7 +150,7 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   detector->projectPhotons(photonHist, photons);
   // Draw out photon histogram and ellipse outline
   TCanvas *c1 = new TCanvas("c1","c1",900,900);
-  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
+  double nPhotons = integrateAndDrawEllipse(beta, photonHist, c1, aerogel2);
   cout << "SINGLE EXAMPLE EVENT: Integrated number of photons in ring: " << nPhotons << endl;
   photonHist->SaveAs("./output/generatedEvent.root");
   photonHist->Draw("colz");
@@ -158,7 +158,7 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta) {
   return photonHist;
 }
 
-TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
+TH2D* Arich::simulateBeam(double beta) {
   // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   // Make Aerogel layer
@@ -277,7 +277,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   photonHist->SetZTitle("Mean Photon Count");
   photonHist->Draw("colz");
 
-  double nPhotons = integrateAndDrawEllipse(pos0, dir0, beta, photonHist, center_pad, aerogel2);
+  double nPhotons = integrateAndDrawEllipse(beta, photonHist, center_pad, aerogel2);
   cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
 
   right_pad->cd();
