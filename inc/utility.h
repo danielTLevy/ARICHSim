@@ -7,9 +7,11 @@
 #include "TEllipse.h"
 
 static TMatrixD makeRotationMatrix(TVector3 dir) {
-  // Rotation matrix to rotate (x,y,z)=(0,0,1) onto dir
-  // https://math.stackexchange.com/questions/180418
-  // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula#Matrix_notation
+  /*
+  Rotation matrix to rotate (x,y,z)=(0,0,1) onto dir
+  https://math.stackexchange.com/questions/180418
+  https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula#Matrix_notation
+  */
 
   TMatrixD rot(3, 3);
   // a = (0, 0, 1)
@@ -35,8 +37,9 @@ static TMatrixD makeRotationMatrix(TVector3 dir) {
 }
 
 static TVector3 rotateVector(TMatrixD rot, double theta, double phi) {
-  // Apply a rotation matrix to a theta and phi
-
+  /*
+  Apply a rotation matrix to a theta and phi
+  */
   // Beam frame angle of photon
   TVector3 dir;
   dir.SetX(cos(phi)*sin(theta));
@@ -55,13 +58,18 @@ static TVector3 refractedDirection(TVector3 l, TVector3 n, double n1, double n2)
 }
 
 static TVector3 reflectedDirection(TVector3 l, TVector3 n, double n1, double n2) {
-  //From: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
-  // light w/ normalized direction l incident on surface w/ normal n, from indices n1 to n2
+  /*
+  From: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+  light w/ normalized direction l incident on surface w/ normal n, from indices n1 to n2
+  */
   double c = -l*n; // cos(theta1) = - l dot n
   return l + 2*c*n;
 }
 
 static TCutG *createCutFromEllipse(TEllipse *ellipse) {
+  /*
+  Return a TCutG, given a TEllipse shape
+  */
   int np = 200;
   double angle,dx,dy;
   double dphi = 2.*TMath::Pi()/np;
@@ -80,5 +88,7 @@ static TCutG *createCutFromEllipse(TEllipse *ellipse) {
    }
   return cut;
 }
+
+
 
 #endif
