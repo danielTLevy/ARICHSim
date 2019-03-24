@@ -32,21 +32,18 @@
 class Arich {
 
 private:
-  const int nEvents = 10000;
-  const double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
-  const double thickness = 2.0; // thickness of aerogel layer
-  const double width = 10.; // x width of aerogel
-  const double height = 10.; // y height of aerogel
-  const double n1 = 1.035; // outer index of refraction
-  const double n2 = 1.045; // inner index of refraction
-  const double detectorDist = 21.0; // dist to detector plane
-  const double errDirX = 0.000; // beam direction error
-  const double errDirY = 0.000;
-  const double errX = 0.001; // beam position error
-  const double errY = 0.001;
-
-  TVector3 pos0;
-  TVector3 dir0;
+  static constexpr int nEvents = 10000;
+  static constexpr inline double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
+  static constexpr double thickness = 2.0; // thickness of aerogel layer
+  static constexpr double width = 10.; // x width of aerogel
+  static constexpr double height = 10.; // y height of aerogel
+  static constexpr double n1 = 1.035; // outer index of refraction
+  static constexpr double n2 = 1.045; // inner index of refraction
+  static constexpr double detectorDist = 21.0; // dist to detector plane
+  static constexpr double errDirX = 0.000; // beam direction error
+  static constexpr double errDirY = 0.000;
+  static constexpr double errX = 0.001; // beam position error
+  static constexpr double errY = 0.001;
 
   struct photonStruct {
     // Initial direction and position
@@ -81,13 +78,12 @@ private:
     int id;
   };
 
-  double integrateAndDrawEllipse(double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel);
+  static double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel);
 
 public:
-  Arich(TVector3 pos0, TVector3 dir0);
-  TH2D* calculatePdf(double beta);
-  TH2D* generateEvent(double beta);
-  TH2D* simulateBeam(double beta);
+  static TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta);
+  static TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save = true);
+  static TH2D* simulateBeam(TVector3 pos0, TVector3 dir0, double beta);
 };
 
 #endif

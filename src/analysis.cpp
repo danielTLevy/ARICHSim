@@ -8,6 +8,7 @@
 #include "TH1D.h"
 #include "TH2D.h"
 #include "TH3D.h"
+#include "THStack.h"
 #include "TFile.h"
 #include "TTree.h"
 #include "TTreeReader.h"
@@ -19,12 +20,6 @@
 #include "TMatrixD.h"
 #include "TMatrixT.h"
 #include "TVector3.h"
-#include "TEllipse.h"
-#include "TCutG.h"
-#include "beam.h"
-#include "aerogel.h"
-#include "particle.h"
-#include "photon.h"
 #include "detector.h"
 #include "arich.h"
 
@@ -74,6 +69,7 @@ TH2D* geant4Pdf(TFile* g4File, int particlei) {
   }
 
   allEventHist->SaveAs(Form("./output/geant4pdfs/%s.root", filename));
+  return allEventHist;
 }
 
 
@@ -111,13 +107,11 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
   */
 
   // First generate 3 particle hypothesis
-  Arich * arich = new Arich(pos0, dir0);
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
     char* namei = (char*) pNames[i];
-    double massi = particleMasses[i];
     double betai = calcBeta(i, particleMom);
-    TH2D* particleiPdf = arich->calculatePdf(betai);
+    TH2D* particleiPdf = Arich::calculatePdf(pos0, dir0, betai);
     particleiPdf->SetName(Form("%sPdf", namei));
     particleiPdf->SetTitle(Form("%s PDF", namei));
     particlePdfs[i] = particleiPdf;
@@ -152,8 +146,6 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
     g4EventHist->Reset();
     char* namej = (char*) pNames[j];
     cout << "Checking likelihoods for " << namej << endl;
-    double massj = particleMasses[j];
-    double betaj = calcBeta(j, particleMom);
     TFile* g4File = TFile::Open(Form("./output/%s/g4/%s.root", analysisDir, namej));
     char* g4PdfName = Form("g4%sPdf", namej);
     TH2D *g4Pdf = new TH2D(g4PdfName,g4PdfName,48,-15,15,48,-15,15);
@@ -224,35 +216,79 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
 }
 
 
-void identifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
-  Arich * arich = new Arich(pos0, dir0);
-  // Given particle, momentum, simulate example event
-  double realBeta = calcBeta(particlei, particleMom);
-  cout << "Real Beta: " << realBeta << endl;
-  TH2D* generatedEvent = arich->generateEvent(realBeta);
-  cout << endl;
-
+void identifyParticle(TH2D* eventHist, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
   vector<double> betas;
   vector<double> loglikes;
-  for (int particleId = 0; particleId < 3; particleId++) {
+  for (int particleId = 0; particleId < NUMPARTICLES; particleId++) {
     // calculate within 2 standard deviations of each particle hypothesis
     cout << "Guess: " << pNames[particleId] << endl;
     for (int i = -2; i < 3; i++) {
       double betaGuess = calcBeta(particleId, particleMom + i*errMom);
       cout << "Beta: " << betaGuess << endl;
-      TH2D *calculatedPdf = arich->calculatePdf(betaGuess);
-      double logLikelihood = computeLogLikelihood(generatedEvent, calculatedPdf);
+      TH2D *calculatedPdf = Arich::calculatePdf(pos0, dir0, betaGuess);
+      double logLikelihood = computeLogLikelihood(eventHist, calculatedPdf);
+      delete calculatedPdf;
       cout << "logLikelihood: " << logLikelihood << endl << endl;
       betas.push_back(betaGuess);
       loglikes.push_back(logLikelihood);
     }
   }
-  TGraph* betalikelihoods = new TGraph(betas.size(), &betas[0], &loglikes[0]);
-  TCanvas* betagraph = new TCanvas("betacanvas", "betacanvas", 900, 900);
-  betalikelihoods->Draw();
-  betagraph->SaveAs("./output/BETA.pdf");
+  TGraph(betas.size(), &betas[0], &loglikes[0]).SaveAs("./output/Beta.root");
 }
 
+
+void testIdentifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
+  // Given particle, momentum, simulate example event, and see if we can identify it
+  double realBeta = calcBeta(particlei, particleMom);
+  cout << "Real Beta: " << realBeta << endl;
+  TH2D* generatedEvent = Arich::generateEvent(pos0, dir0, realBeta);
+  identifyParticle(generatedEvent, particleMom, pos0, dir0);
+}
+
+
+void identifyMultiParticle(TH2D* eventHist, int nParticles, vector<int> particleis, vector<double> particleMoms,
+                           vector<TVector3> pos0s, vector<TVector3> dir0s, double errMom=0.5) {
+  // Run multidimensional particle identification 
+  THStack *hs = new THStack("pdfStack","");
+  for (int i = 0; i < nParticles; i++) {
+    double realBeta = calcBeta(particleis[i], particleMoms[i]);
+    hs->Add(Arich::calculatePdf(pos0s[i], dir0s[i], realBeta));
+  }
+  hs->GetStack()->Last()->SaveAs("./output/stackedPdfs.root");
+
+}
+
+void testIdentifyMultiParticle(int nParticles) {
+  // Simulate multiparticle event, and test our ability to identify it
+  THStack histStack("eventStack","");
+  vector<int> particles;
+  vector<TVector3> pos0s;
+  vector<TVector3> dir0s;
+  vector<double> moms;
+  TRandom3 randomGen = TRandom3();
+  for (int i = 0; i < nParticles; i++) {
+    int particlei = randomGen.Integer(NUMPARTICLES);
+    double momentumi = randomGen.Gaus(10, 2);
+    double betai = calcBeta(particlei, momentumi);
+    TVector3 pos0i;
+    TVector3 dir0i;
+    for (int d = 0; d < 2; d++) {
+      pos0i[d] = min(5.,max(-5.,(randomGen.Gaus(0., 2.))));
+      dir0i[d] = min(0.6,max(-0.6, randomGen.Gaus(0,0.3)));
+    }
+    dir0i[2] = sqrt(1-dir0i[0]*dir0i[0]-dir0i[1]*dir0i[0]);
+    pos0i[2] = 0;
+    histStack.Add(Arich::generateEvent(pos0i, dir0i, betai, false));
+    particles.push_back(particlei);
+    pos0s.push_back(pos0i);
+    dir0s.push_back(dir0i);
+    moms.push_back(momentumi);
+  }
+  TH2D* eventHist = (TH2D*) histStack.GetStack()->Last();
+  eventHist->SaveAs("./output/stackedEvents.root");
+  identifyMultiParticle(eventHist, nParticles, particles, moms, pos0s, dir0s);
+
+}
 
 int main(int argc, char *argv[]) {
   if (argc == 1) {
@@ -260,6 +296,7 @@ int main(int argc, char *argv[]) {
          << "Make pdf given particle and momentum:  -g <pid> <mom> [xdir ydir xpos ypos]" << endl
          << "Make pdf given beta:                   -b [beta xdir ydir xpos ypos]" << endl
          << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl
+         << "Run multi-particle identification:    -mp <nparticles>" << endl
          << "Make PDF given Geant4 TTree:           -gpdf <g4filename> <pid>" << endl
          << "Check particle separation:             -s <analysisdir> <mom> [xdir ydir xpos ypos]" << endl;
     return -1;
@@ -277,7 +314,10 @@ int main(int argc, char *argv[]) {
   char* analysisDir;
   bool g4 = false;
   int argi = 2;
-
+  if (mode == "-mp") {
+    testIdentifyMultiParticle(atoi(argv[argi]));
+    return 1;
+  }
   if (mode == "-gpdf") {
     g4File = TFile::Open(argv[argi]);
     argi = argi + 1;
@@ -326,12 +366,11 @@ int main(int argc, char *argv[]) {
       beta = calcBeta(particlei, particleMom);
       cout << "Beta: " << beta << endl;
     }
-    Arich* arich = new Arich(pos0, dir0);
-    arich->simulateBeam(beta);
+    Arich::simulateBeam(pos0, dir0, beta);
   }
 
   if (mode == "-p") {
-    identifyParticle(particlei, particleMom, pos0,  dir0);
+    testIdentifyParticle(particlei, particleMom, pos0,  dir0);
   }
 
   if (mode == "-s") {
