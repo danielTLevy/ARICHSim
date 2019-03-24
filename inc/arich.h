@@ -37,8 +37,8 @@ private:
   static constexpr double thickness = 2.0; // thickness of aerogel layer
   static constexpr double width = 10.; // x width of aerogel
   static constexpr double height = 10.; // y height of aerogel
-  static constexpr double n1 = 1.035; // outer index of refraction
-  static constexpr double n2 = 1.045; // inner index of refraction
+  static constexpr double n1 = 1.0352; // outer index of refraction
+  static constexpr double n2 = 1.0452; // inner index of refraction
   static constexpr double detectorDist = 21.0; // dist to detector plane
   static constexpr double errDirX = 0.000; // beam direction error
   static constexpr double errDirY = 0.000;

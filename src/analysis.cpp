@@ -50,7 +50,7 @@ TH2D* geant4Pdf(TFile* g4File, int particlei) {
   TTreeReaderArray<Double_t> raPos(reader, "Pos");
   TTreeReaderArray<Double_t> raDir(reader, "Dir");
   Detector* detector = new Detector(0);
-  TH2D *allEventHist = new TH2D(filename, filename,48,-15,15,48,-15,15);
+  TH2D *allEventHist = new TH2D(filename, filename,200,-20,20,200,-20,20);
 
   while (reader.Next()) {
       // Get only forward-exiting optical photons
@@ -296,7 +296,7 @@ int main(int argc, char *argv[]) {
          << "Make pdf given particle and momentum:  -g <pid> <mom> [xdir ydir xpos ypos]" << endl
          << "Make pdf given beta:                   -b [beta xdir ydir xpos ypos]" << endl
          << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl
-         << "Run multi-particle identification:    -mp <nparticles>" << endl
+         << "Run multi-particle identification:     -mp <nparticles>" << endl
          << "Make PDF given Geant4 TTree:           -gpdf <g4filename> <pid>" << endl
          << "Check particle separation:             -s <analysisdir> <mom> [xdir ydir xpos ypos]" << endl;
     return -1;
@@ -313,10 +313,14 @@ int main(int argc, char *argv[]) {
   TFile *g4File = nullptr;
   char* analysisDir;
   bool g4 = false;
+  TVector3 pos0;
+  TVector3 dir0;
+  int nParticles = 0;
   int argi = 2;
+
   if (mode == "-mp") {
-    testIdentifyMultiParticle(atoi(argv[argi]));
-    return 1;
+    nParticles = atoi(argv[argi]);
+    argi = argi + 1;
   }
   if (mode == "-gpdf") {
     g4File = TFile::Open(argv[argi]);
@@ -331,7 +335,7 @@ int main(int argc, char *argv[]) {
     cout << "Particle: " << pNames[particlei] << endl;
     argi = argi + 1;
   }
-  if (mode ==  "-g" || mode == "-p" || mode == "-s" || mode == "-gpdf" || mode == "-sd") {
+  if (mode ==  "-g" || mode == "-p" || mode == "-s" || mode == "-sd") {
     particleMom = atof(argv[argi]);
     cout << "Momentum: " << particleMom << " GeV" << endl;
     argi = argi + 1;
@@ -350,16 +354,21 @@ int main(int argc, char *argv[]) {
     y_0 = atof(argv[argi + 1]);
     argi = argi + 2;
   }
-  cout << "X Dir: " << dirX_0 << endl;
-  cout << "Y Dir: " << dirY_0 << endl;
-  cout << "X Pos: " << x_0 << endl;
-  cout << "Y Pos: " << y_0 << endl;
-  double dirZ_0 = sqrt(1. - dirX_0*dirX_0 - dirY_0*dirY_0);
-  TVector3 pos0 = TVector3(x_0, y_0, 0);
-  TVector3 dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();
+  if (mode != "-mp") {
+    cout << "X Dir: " << dirX_0 << endl;
+    cout << "Y Dir: " << dirY_0 << endl;
+    cout << "X Pos: " << x_0 << endl;
+    cout << "Y Pos: " << y_0 << endl;
+    double dirZ_0 = sqrt(1. - dirX_0*dirX_0 - dirY_0*dirY_0);
+    pos0 = TVector3(x_0, y_0, 0);
+    dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();    
+  }
 
   // Do the thing
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
+  if (mode == "-mp") {
+    testIdentifyMultiParticle(nParticles);
+  }
   if (mode == "-g" || mode == "-b") {
     // Given particle and momentum, simulate centered beam à la Geant4
     if (mode == "-g") {

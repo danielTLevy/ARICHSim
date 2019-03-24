@@ -123,8 +123,9 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save)
   Detector* detector = new Detector(detectorDist);
   // Make photons in first aerogel
   std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
+  bool refract = true;
   aerogel1->applyPhotonScatters(photons);
-  aerogel1->exitAerogel(photons, true);
+  aerogel1->exitAerogel(photons, refract);
   // Advance particle forward to next aerogel and generate photons
   pa->travelZDist(aeroPos[1] - aeroPos[0]);
   std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
@@ -132,11 +133,11 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save)
   photons.insert(photons.end(), photons2.begin(), photons2.end());
   // Include scattering in second aerogel
   aerogel2->applyPhotonScatters(photons);
-  aerogel2->exitAerogel(photons, true);
+  aerogel2->exitAerogel(photons, refract);
   aerogel1->applyPhotonScatters(photons);
-  aerogel1->exitAerogel(photons, true);
+  aerogel1->exitAerogel(photons, refract);
   aerogel2->applyPhotonScatters(photons);
-  aerogel2->exitAerogel(photons, true);
+  aerogel2->exitAerogel(photons, refract);
   // Throw out photons based off fill factor
   int numPhotonsDetected = (int) (detector->getFillFactor() * photons.size());
   photons.resize(numPhotonsDetected);
@@ -169,7 +170,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   Detector* detector = new Detector(detectorDist);
 
   // Get plots ready
-  TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
+  TH2D *photonHist = new TH2D("photonHist","photonHist",200,-20,20,200,-20,20);
   photonHist->SetXTitle("x [cm]");
   photonHist->SetYTitle("y [cm]");
   TH1D *rHist = new TH1D("rHist", "rHist", 500, 0., 10.);
@@ -200,22 +201,23 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
     pa->travelZDist(aeroPos[1] - aeroPos[0]);
     std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
     // Scatter photons in first aerogel, move them forwards out of aerogel
+    bool refract = true;
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, true);
+    aerogel1->exitAerogel(photons, refract);
     // Combine photons from both aerogels
     photons.insert(photons.end(), photons2.begin(), photons2.end());
     // Include scattering in second aerogel
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, true);
+    aerogel2->exitAerogel(photons, refract);
     // Do some more scattering
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, true);
+    aerogel1->exitAerogel(photons, refract);
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, true);
+    aerogel2->exitAerogel(photons, refract);
     aerogel1->applyPhotonScatters(photons);
-    aerogel1->exitAerogel(photons, true);
+    aerogel1->exitAerogel(photons, refract);
     aerogel2->applyPhotonScatters(photons);
-    aerogel2->exitAerogel(photons, true);
+    aerogel2->exitAerogel(photons, refract);
 
     // Project photons onto detector and plot distribution
     detector->projectPhotons(photonHist, rHist, photons);

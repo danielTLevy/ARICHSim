@@ -219,7 +219,6 @@ void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
 std::vector<Photon*> Aerogel::generatePhotons(Particle* pa, Detector* detector) {
   // Create Cherenkov photons as the particle passes through the gel
   // Hacky, but requires detector
-  TMatrixD rotMatrix = makeRotationMatrix(pa->dir);
   double paDist = getDistInGel(pa);
 
   std::vector<Photon*> photons;
@@ -235,11 +234,11 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa, Detector* detector) 
       // Get the point where the photon was emitted
       double phIntDist = randomGenerate->Uniform(paDist);
       TVector3 phPos = pa->pos + phIntDist*pa->dir;
-      // Get the direection of the new photon
+      // Get the direction of the new photon
       double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-      TVector3 dirCR = rotateVector(rotMatrix, chAngle, phPhi).Unit();
-      // Get the wavelength of the photon
-
+      TVector3 dirCR = TVector3(sin(chAngle)*cos(phPhi), sin(chAngle)*sin(phPhi), cos(chAngle));
+      // Rotate onto particle direction
+      dirCR.RotateUz(pa->dir);
       Photon* photon = new Photon(phPos, dirCR, wav);
       photons.push_back(photon);
     }
