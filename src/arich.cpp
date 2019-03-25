@@ -58,8 +58,8 @@ TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   // Make Aerogel layer
-  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
-  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
+  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos1, beta);
+  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos2, beta);
   // Make them aware of each other for refraction purposes
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
@@ -73,7 +73,7 @@ TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
     // Make photons in first aerogel
     std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
     // Advance particle forward to next aerogel and generate photons
-    pa->travelZDist(aeroPos[1] - aeroPos[0]);
+    pa->travelZDist(aeroPos2 - aeroPos1);
     std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
     // Scatter photons in first aerogel, move them forwards out of aerogel
     aerogel1->applyPhotonScatters(photons);
@@ -114,8 +114,8 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save)
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   Particle *pa = beam->generateParticle();
   // Make Aerogel layer
-  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
-  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
+  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos1, beta);
+  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos2, beta);
   // Make them aware of each other for refraction purposes
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
@@ -127,7 +127,7 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save)
   aerogel1->applyPhotonScatters(photons);
   aerogel1->exitAerogel(photons, refract);
   // Advance particle forward to next aerogel and generate photons
-  pa->travelZDist(aeroPos[1] - aeroPos[0]);
+  pa->travelZDist(aeroPos2 - aeroPos1);
   std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
   // Combine photons from both aerogels
   photons.insert(photons.end(), photons2.begin(), photons2.end());
@@ -161,8 +161,8 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   // Make Aerogel layer
-  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos[0], beta);
-  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos[1], beta);
+  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos1, beta);
+  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos2, beta);
   // Make them aware of each other for refraction purposes
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
@@ -198,7 +198,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
     // Make photons in first aerogel
     std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
     // Advance particle forward to next aerogel and generate photons
-    pa->travelZDist(aeroPos[1] - aeroPos[0]);
+    pa->travelZDist(aeroPos2 - aeroPos1);
     std::vector<Photon*> photons2 = aerogel2->generatePhotons(pa, detector);
     // Scatter photons in first aerogel, move them forwards out of aerogel
     bool refract = true;

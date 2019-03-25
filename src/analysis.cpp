@@ -115,7 +115,7 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
     particleiPdf->SetName(Form("%sPdf", namei));
     particleiPdf->SetTitle(Form("%s PDF", namei));
     particlePdfs[i] = particleiPdf;
-    particleiPdf->SaveAs(Form("./output/%s/%sPdfHist.root", analysisDir, namei));
+    particleiPdf->SaveAs(Form("%s%sPdfHist.root", analysisDir, namei));
   }
 
   // Next, compare each of the 3 geant4 outputs to these 3 particle hypotheses
@@ -145,8 +145,8 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
     // For each particle type, run through the whole geant4-generated ttree.
     g4EventHist->Reset();
     char* namej = (char*) pNames[j];
-    cout << "Checking likelihoods for " << namej << endl;
-    TFile* g4File = TFile::Open(Form("./output/%s/g4/%s.root", analysisDir, namej));
+    //cout << "Checking likelihoods for " << namej << endl;
+    TFile* g4File = TFile::Open(Form("%s%s.root", analysisDir, namej));
     char* g4PdfName = Form("g4%sPdf", namej);
     TH2D *g4Pdf = new TH2D(g4PdfName,g4PdfName,48,-15,15,48,-15,15);
     // Prepare values to update in our loop
@@ -190,25 +190,25 @@ void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char*
         g4Pdf->Fill(xFinal, yFinal);
       }
     }
-    g4Pdf->SaveAs(Form("./output/%s/%s.root", analysisDir, g4PdfName));
+    g4Pdf->SaveAs(Form("%s%s.root", analysisDir, g4PdfName));
   }
   // Save the output for each of the ratios.
-  TFile *likelihoodFile = new TFile(Form("./output/%s/likelihoods.root", analysisDir), "RECREATE"); 
+  TFile *likelihoodFile = new TFile(Form("%s/likelihoods.root", analysisDir), "RECREATE"); 
   likelihoodFile->cd();
   for (int j = 0; j < NUMPARTICLES; j++) {
     for (int i = 0; i < NUMPARTICLES; i++) {
       if (i != j) {
         likelihoodRatios[i][j]->Write();
         if (i > j) {
-          cout << pNames[i] << "/" << pNames[j] << ": " << endl;
+          cout << pNames[i] << pNames[j] << ": " << endl;
           double deltaMean = likelihoodRatios[i][j]->GetMean() - likelihoodRatios[j][i]->GetMean();
           double width = sqrt(TMath::Power(likelihoodRatios[i][j]->GetRMS(),2) +
                             TMath::Power(likelihoodRatios[j][i]->GetRMS(),2));
-          cout << "\tseparation: " << deltaMean / width << endl;
+          cout << "Separation: " << deltaMean / width << endl;
           double pctjMisidentified = 100.*likelihoodRatios[i][j]->Integral(0,   149)/likelihoodRatios[i][j]->GetSum();
           double pctiMisidentified = 100.*likelihoodRatios[j][i]->Integral(150, 300)/likelihoodRatios[i][j]->GetSum();
-          cout << "\t" << pctiMisidentified << "% " << pNames[i] << "s Misidentified" << endl;
-          cout << "\t" << pctjMisidentified << "% " << pNames[j] << "s Misidentified" << endl;
+          cout << pNames[i] << "ErrPct: " << pctiMisidentified << endl;
+          cout << pNames[j] << "ErrPct: " << pctjMisidentified << endl;
         }
       }
     }
@@ -337,7 +337,7 @@ int main(int argc, char *argv[]) {
   }
   if (mode ==  "-g" || mode == "-p" || mode == "-s" || mode == "-sd") {
     particleMom = atof(argv[argi]);
-    cout << "Momentum: " << particleMom << " GeV" << endl;
+    cout << "Mom: " << particleMom << endl;
     argi = argi + 1;
   }
   if (mode == "-b" && argc > 2) {
@@ -355,10 +355,10 @@ int main(int argc, char *argv[]) {
     argi = argi + 2;
   }
   if (mode != "-mp") {
-    cout << "X Dir: " << dirX_0 << endl;
-    cout << "Y Dir: " << dirY_0 << endl;
-    cout << "X Pos: " << x_0 << endl;
-    cout << "Y Pos: " << y_0 << endl;
+    cout << "XDir: " << dirX_0 << endl;
+    cout << "YDir: " << dirY_0 << endl;
+    cout << "XPos: " << x_0 << endl;
+    cout << "YPos: " << y_0 << endl;
     double dirZ_0 = sqrt(1. - dirX_0*dirX_0 - dirY_0*dirY_0);
     pos0 = TVector3(x_0, y_0, 0);
     dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();    
@@ -391,6 +391,6 @@ int main(int argc, char *argv[]) {
   }
 
   auto duration = duration_cast<microseconds>( high_resolution_clock::now() - t1 ).count();
-  cout << "Time taken: " << duration / 1000000. << endl;
+  //cout << "Time taken: " << duration / 1000000. << endl;
   return 0;
 }

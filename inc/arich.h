@@ -33,7 +33,8 @@ class Arich {
 
 private:
   static constexpr int nEvents = 10000;
-  static constexpr inline double aeroPos[2] = {0., 2.0}; // positions of aerogel planes
+  static constexpr double aeroPos1 = 0.; // positions of aerogel planes
+  static constexpr double aeroPos2 = 2.;
   static constexpr double thickness = 2.0; // thickness of aerogel layer
   static constexpr double width = 10.; // x width of aerogel
   static constexpr double height = 10.; // y height of aerogel
