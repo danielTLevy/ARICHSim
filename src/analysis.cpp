@@ -97,11 +97,113 @@ double computeLogLikelihood(TH2D* event, TH2D* distribution) {
   return -2*logLikelihood;
 }
 
-
-void calculateSeparation(double particleMom, TVector3 pos0, TVector3 dir0, char* analysisDir) {
+void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char* analysisDir) {
   /*
   Compare each particle geant4 root file to a different simulated particle PDF
-  Requires an analysisDir in the out directory
+  Requires an analysisDir, containing g4 ttrees for each particle
+  Outputs each loglikelihood for each particle
+  */
+
+  double mom = particleMom;
+  double xdir = dir0[0];
+  double ydir = dir0[1];
+  double xpos = pos0[0];
+  double ypos = pos0[1];
+  int particle;
+  double piloglike;
+  double kloglike;
+  double ploglike;
+
+  TString filename = Form("%sloglikes.root", analysisDir);
+  TFile *hfile = 0;
+  TTree *tree = new TTree("T","loglikes");
+  tree->Branch("mom",&mom,"mom/D");
+  tree->Branch("xdir",&xdir,"xdir/D");
+  tree->Branch("ydir",&ydir,"ydir/D");
+  tree->Branch("xpos",&xpos,"xpos/D");
+  tree->Branch("ypos",&ypos,"ypos/D");
+  tree->Branch("particle", &particle, "particle/I");
+  tree->Branch("piloglike",&piloglike,"piloglike/D");
+  tree->Branch("kloglike",&kloglike,"kloglike/D");
+  tree->Branch("ploglike",&ploglike,"ploglike/D");
+
+
+
+  // First generate 3 particle hypothesis
+  TH2D* particlePdfs[NUMPARTICLES];
+  for (int i = 0; i < NUMPARTICLES; i++) {
+    char* namei = (char*) pNames[i];
+    double betai = calcBeta(i, particleMom);
+    TH2D* particleiPdf = Arich::calculatePdf(pos0, dir0, betai);
+    particleiPdf->SetName(Form("%sPdf", namei));
+    particleiPdf->SetTitle(Form("%s PDF", namei));
+    particlePdfs[i] = particleiPdf;
+    particleiPdf->SaveAs(Form("%s%sPdfHist.root", analysisDir, namei));
+  }
+
+  // Next, compare each of the 3 geant4 outputs to these 3 particle hypotheses
+  TRandom3 randomGen = TRandom3();
+  Detector* detector = new Detector(0);
+
+  TH2D *g4EventHist = new TH2D("g4EventHist","g4EventHist",48,-15,15,48,-15,15);
+  for (int j = 0; j < NUMPARTICLES; j++) {
+    particle = j;
+
+    // For each particle type, run through the whole geant4-generated ttree.
+    g4EventHist->Reset();
+    char* namej = (char*) pNames[j];
+    TFile* g4File = TFile::Open(Form("%s%s.root", analysisDir, namej));
+    char* g4PdfName = Form("g4%sPdf", namej);
+    TH2D *g4Pdf = new TH2D(g4PdfName,g4PdfName,48,-15,15,48,-15,15);
+    // Prepare values to update in our loop
+    TTreeReader reader("h1000", g4File);
+    TTreeReaderValue<Int_t> rvEvent(reader, "EventNumber");
+    TTreeReaderValue<Int_t> rvPid(reader, "Pid");
+    TTreeReaderArray<Double_t> raMom(reader, "Mom");
+    TTreeReaderArray<Double_t> raPos(reader, "Pos");
+    TTreeReaderArray<Double_t> raDir(reader, "Dir");
+    int currEventId = 0;
+    while (reader.Next()) {
+      // Get only forward-exiting optical photons
+      if (*rvPid != 0 || raPos[2] < 829.99) {
+          continue;
+      }
+      // After we have all our photons in an event, fill loglikelihood histograms for each particle type
+      if (*rvEvent != currEventId) {
+        piloglike  = computeLogLikelihood(g4EventHist, particlePdfs[0]);
+        kloglike  = computeLogLikelihood(g4EventHist, particlePdfs[1]);
+        ploglike  = computeLogLikelihood(g4EventHist, particlePdfs[2]);
+        tree->Fill();
+        g4EventHist->Reset();
+        currEventId = *rvEvent;
+      }
+      // Fill our event Histogram
+      // Momentum in GeV/c:
+      double momMag = sqrt(raMom[0]*raMom[0] + raMom[1]*raMom[1] + raMom[2]*raMom[2]);
+      // Wavelength in m
+      double wav = SPEEDOFLIGHT * PLANCKSCONST / (1E9 * momMag);
+      double efficiency = DETECTORFILL * detector->evalQEff(wav);
+      if ( randomGen.Uniform() < efficiency) {
+        // Project onto detector, and convert from mm to cm
+        double xFinal = 0.1*(raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2]);
+        double yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
+        g4EventHist->Fill(xFinal, yFinal);
+        g4Pdf->Fill(xFinal, yFinal);
+      }
+    }
+    g4Pdf->SaveAs(Form("%s%s.root", analysisDir, g4PdfName));
+  }
+  // Save the likelihoods
+  hfile = TFile::Open(filename,"RECREATE");
+  tree->Write();
+}
+
+
+
+void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, char* analysisDir) {
+  /*
+  Compare each particle geant4 root file to a different simulated particle PDF
+  //Requires an analysisDir in the out directory
     - This contains a directory "g4" which contains all the ttrees for the geant4
   Outputs loglikelihood ratio for each particle pair, and .pdfs of the PDFs
   */
@@ -298,7 +400,7 @@ int main(int argc, char *argv[]) {
          << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl
          << "Run multi-particle identification:     -mp <nparticles>" << endl
          << "Make PDF given Geant4 TTree:           -gpdf <g4filename> <pid>" << endl
-         << "Check particle separation:             -s <analysisdir> <mom> [xdir ydir xpos ypos]" << endl;
+         << "Check loglikes for each particle:      -s <analysisdir> <mom> [xdir ydir xpos ypos]" << endl;
     return -1;
   }
 
@@ -383,7 +485,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (mode == "-s") {
-    calculateSeparation(particleMom, pos0, dir0, analysisDir);
+    calculateAllLoglikes(particleMom, pos0, dir0, analysisDir);
   }
 
   if (mode == "-gpdf") {
@@ -391,6 +493,6 @@ int main(int argc, char *argv[]) {
   }
 
   auto duration = duration_cast<microseconds>( high_resolution_clock::now() - t1 ).count();
-  //cout << "Time taken: " << duration / 1000000. << endl;
+  cout << "Time taken: " << duration / 1000000. << endl;
   return 0;
 }
