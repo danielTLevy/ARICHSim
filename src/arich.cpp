@@ -66,7 +66,7 @@ TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   // Make the detector
   Detector* detector = new Detector(detectorDist);
   // Get hist ready
-  TH2D *photonHist = new TH2D("photonHist","photonHist",48,-15,15,48,-15,15);
+  TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
   // Make events and loop over them
   for (int i = 0; i < nEvents; i++) {
     Particle *pa = beam->generateParticle();
@@ -142,7 +142,7 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save)
   int numPhotonsDetected = (int) (detector->getFillFactor() * photons.size());
   photons.resize(numPhotonsDetected);
   // Project photons onto detector and plot distribution
-  TH2D *photonHist = new TH2D("generatedEvent","generatedEvent",48,-15,15,48,-15,15);
+  TH2D *photonHist = detector->makeDetectorHist("generatedEvent","generatedEvent");
   detector->projectPhotons(photonHist, photons);
   if (save) {
     // Draw out photon histogram and ellipse outline
@@ -167,10 +167,12 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
   // Make the detector
-  Detector* detector = new Detector(detectorDist);
+  Detector* detector = new Detector(detectorDist, true);
 
   // Get plots ready
-  TH2D *photonHist = new TH2D("photonHist","photonHist",200,-20,20,200,-20,20);
+  //TH2D *photonHist = new TH2D("photonHist","photonHist",200,-20,20,200,-20,20);
+  TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
+
   photonHist->SetXTitle("x [cm]");
   photonHist->SetYTitle("y [cm]");
   TH1D *rHist = new TH1D("rHist", "rHist", 500, 0., 10.);
@@ -220,7 +222,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
     aerogel2->exitAerogel(photons, refract);
 
     // Project photons onto detector and plot distribution
-    detector->projectPhotons(photonHist, rHist, photons);
+    detector->projectPhotons(photonHist, photons, rHist);
 
     // Save photons to TTree and delete
     for (int j = 0; j < photons.size(); j++) {
@@ -243,6 +245,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
       phStruct.posye = phPos[1];
       phStruct.posze = phPos[2];
       phStruct.wav = ph->wav;
+      phStruct.numscat = ph->numScatters;
       tree->Fill();
       delete ph;
     }

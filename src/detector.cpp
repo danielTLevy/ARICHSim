@@ -1,11 +1,12 @@
 #include "detector.h"
 
-Detector::Detector(double zPos) {
+Detector::Detector(double zPos, bool mirror) {
   this->zPos = zPos;
   this->quantumEff = createQEff();
   this->randomGenerate=std::make_shared<TRandom3>();
   this->randomGenerate->SetSeed(0);
   this->fillFactor = 0.8*0.87;
+  this->mirror = mirror;
 };
 
 TGraph* Detector::createQEff() {
@@ -43,6 +44,10 @@ TGraph* Detector::createQEff() {
   return qe;
 }
 
+TH2D* Detector::makeDetectorHist(char* name, char* title) {
+  return new TH2D(name, title, xpixels, xmin, xmax, ypixels, ymin, ymax);
+}
+
 double Detector::getFillFactor() {
   return fillFactor;
 }
@@ -56,25 +61,44 @@ double Detector::evalQEff(double wav) {
   }
 }
 
-void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons) {
+
+void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons, TH1D* rHist) {
   for (int j = 0; j < photons.size(); j++) {
     Photon* ph = photons[j];
-    double phDist = ph->dist(zPos);
-    double xFinal = ph->pos[0] + phDist*ph->dir[0];
-    double yFinal = ph->pos[1] + phDist*ph->dir[1];
-    photonHist->Fill(xFinal, yFinal);
+    // Get distance to each wall in direction of travel
+    double xDist = (TMath::Sign(xmax, ph->dir[0]) - ph->pos[0]) / ph->dir[0];
+    double yDist = (TMath::Sign(ymax, ph->dir[1]) - ph->pos[1]) / ph->dir[1];
+    double zDist = (zPos - ph->pos[2]) / ph->dir[2];
+    // Pick the x y or z dimension with the closest wall and travel that way
+    double dists[3] = {xDist, yDist, zDist};
+    int minDistDimension = TMath::LocMin(3, dists);
+    ph->travelDist(dists[minDistDimension]-0.00001);
+
+    if (mirror) {
+      TVector3 incidentPlane;
+      int counter = 0;
+      while (minDistDimension != 2 && counter < 10) {
+        // Get the normal vector of that wall
+        incidentPlane = TVector3(0.,0.,0.);
+        incidentPlane[minDistDimension] = TMath::Sign(1, -ph->dir[minDistDimension]);
+        // Reflect the light
+        ph->dir = reflectedDirection(ph->dir, incidentPlane);
+        // Pick the x y or z dimension with the closest wall and travel that way
+        dists[0] = (TMath::Sign(xmax, ph->dir[0]) - ph->pos[0]) / ph->dir[0];
+        dists[1] = (TMath::Sign(ymax, ph->dir[1]) - ph->pos[1]) / ph->dir[1];
+        dists[2] = (zPos - ph->pos[2]) / ph->dir[2];
+        minDistDimension = TMath::LocMin(3, dists);
+
+        ph->travelDist(dists[minDistDimension]);
+        counter++;
+      }
+    }
+    if (minDistDimension == 2) {
+      photonHist->Fill(ph->pos[0], ph->pos[1]);
+      if (rHist) {
+        rHist->Fill(sqrt(ph->pos[0]*ph->pos[0] + ph->pos[1]*ph->pos[1]));
+      }
+    }
   }
 }
-
-void Detector::projectPhotons(TH2D* photonHist, TH1D* rHist, std::vector<Photon*> photons) {
-  for (int j = 0; j < photons.size(); j++) {
-    Photon* ph = photons[j];
-    double phDist = ph->dist(zPos);
-    double xFinal = ph->pos[0] + phDist*ph->dir[0];
-    double yFinal = ph->pos[1] + phDist*ph->dir[1];
-    photonHist->Fill(xFinal, yFinal);
-    rHist->Fill(sqrt(xFinal*xFinal + yFinal*yFinal));
-  }
-}
-
 
