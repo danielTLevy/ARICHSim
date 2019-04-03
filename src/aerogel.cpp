@@ -169,6 +169,7 @@ double Aerogel::getIntLengthForWav(double wav) {
 
 double Aerogel::getRandomIntDistance(double wav) {
   double intLength = getIntLengthForWav(wav);
+  // Inverse Transform Sampling:
   // Our CDF of whether photon has interacted is 1 - exp(- x / interactionL)
   // Sample randomly for value of CDF
   // Invert the equation to get the x value that would get this random value

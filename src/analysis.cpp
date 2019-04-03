@@ -26,22 +26,22 @@
 using namespace std;
 using namespace std::chrono;
 
-const char* pNames[3] = {"Pion", "Kaon", "Proton"};
+const char* PNAMES[3] = {"Pion", "Kaon", "Proton"};
 const int NUMPARTICLES = 3;
-const double particleMasses[3] = {0.1395701, 0.493677, 0.938272};
+const double MASSES[3] = {0.1395701, 0.493677, 0.938272};
 const double PLANCKSCONST = 4.135667662E-15;
 const double SPEEDOFLIGHT = 2.99792458E8;
 const double DETECTORFILL = 0.8*0.87;
 
 
 double calcBeta(int particlei, double mom) {
-  double M = particleMasses[particlei];
+  double M = MASSES[particlei];
   return sqrt(1/(1 + M*M/(mom*mom)));
 }
 
 
 TH2D* geant4Pdf(TFile* g4File, int particlei) {
-  const char* particle = pNames[particlei];
+  const char* particle = PNAMES[particlei];
   char* filename = Form("%sG4Pdf", particle);
   // Prepare values to update in our loop
   TTreeReader reader("h1000", g4File);
@@ -132,7 +132,7 @@ void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char
   // First generate 3 particle hypothesis
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
-    char* namei = (char*) pNames[i];
+    char* namei = (char*) PNAMES[i];
     double betai = calcBeta(i, particleMom);
     TH2D* particleiPdf = Arich::calculatePdf(pos0, dir0, betai);
     particleiPdf->SetName(Form("%sPdf", namei));
@@ -151,7 +151,7 @@ void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char
 
     // For each particle type, run through the whole geant4-generated ttree.
     g4EventHist->Reset();
-    char* namej = (char*) pNames[j];
+    char* namej = (char*) PNAMES[j];
     TFile* g4File = TFile::Open(Form("%s%s.root", analysisDir, namej));
     char* g4PdfName = Form("g4%sPdf", namej);
     TH2D *g4Pdf = new TH2D(g4PdfName,g4PdfName,48,-15,15,48,-15,15);
@@ -211,7 +211,7 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
   // First generate 3 particle hypothesis
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
-    char* namei = (char*) pNames[i];
+    char* namei = (char*) PNAMES[i];
     double betai = calcBeta(i, particleMom);
     TH2D* particleiPdf = Arich::calculatePdf(pos0, dir0, betai);
     particleiPdf->SetName(Form("%sPdf", namei));
@@ -228,12 +228,12 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
         // Ratio of particle likelihoods for max(i,j) to min(i,j) for a given particle j
         // max and min are used so that the ratio is consistent for both particle types looked at
         char* histName = Form("%s%sRatio%s",
-                                (char*)pNames[max(i,j)],
-                                (char*)pNames[min(i,j)],
-                                (char*) pNames[j]);
-        char* ratioName = Form("%s/%s Ratio", (char*)pNames[max(i,j)],
-                                              (char*)pNames[min(i,j)]);
-        char* histTitle = Form("%s, %ss", ratioName, (char*) pNames[j]);
+                                (char*)PNAMES[max(i,j)],
+                                (char*)PNAMES[min(i,j)],
+                                (char*) PNAMES[j]);
+        char* ratioName = Form("%s/%s Ratio", (char*)PNAMES[max(i,j)],
+                                              (char*)PNAMES[min(i,j)]);
+        char* histTitle = Form("%s, %ss", ratioName, (char*) PNAMES[j]);
         likelihoodRatios[i][j] = new TH1D(histName, histTitle, 300, -150, 150);
         likelihoodRatios[i][j]->SetXTitle(ratioName);
         likelihoodRatios[i][j]->SetYTitle("Count");
@@ -246,7 +246,7 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
   for (int j = 0; j < NUMPARTICLES; j++) {
     // For each particle type, run through the whole geant4-generated ttree.
     g4EventHist->Reset();
-    char* namej = (char*) pNames[j];
+    char* namej = (char*) PNAMES[j];
     //cout << "Checking likelihoods for " << namej << endl;
     TFile* g4File = TFile::Open(Form("%s%s.root", analysisDir, namej));
     char* g4PdfName = Form("g4%sPdf", namej);
@@ -266,6 +266,10 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
       }
       // After we have all our photons in an event, fill loglikelihood histograms for each particle type
       if (*rvEvent != currEventId) {
+        if (*rvEvent == 99) {
+          g4EventHist->SaveAs(Form("%sExample%s.root", analysisDir, g4PdfName));
+        }
+
         double likelihoods[NUMPARTICLES];
         for (int i = 0; i < NUMPARTICLES; i++) {
           likelihoods[i] = computeLogLikelihood(g4EventHist, particlePdfs[i]);
@@ -302,15 +306,15 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
       if (i != j) {
         likelihoodRatios[i][j]->Write();
         if (i > j) {
-          cout << pNames[i] << pNames[j] << ": " << endl;
+          cout << PNAMES[i] << PNAMES[j] << ": " << endl;
           double deltaMean = likelihoodRatios[i][j]->GetMean() - likelihoodRatios[j][i]->GetMean();
           double width = sqrt(TMath::Power(likelihoodRatios[i][j]->GetRMS(),2) +
                             TMath::Power(likelihoodRatios[j][i]->GetRMS(),2));
           cout << "Separation: " << deltaMean / width << endl;
           double pctjMisidentified = 100.*likelihoodRatios[i][j]->Integral(0,   149)/likelihoodRatios[i][j]->GetSum();
           double pctiMisidentified = 100.*likelihoodRatios[j][i]->Integral(150, 300)/likelihoodRatios[i][j]->GetSum();
-          cout << pNames[i] << "ErrPct: " << pctiMisidentified << endl;
-          cout << pNames[j] << "ErrPct: " << pctjMisidentified << endl;
+          cout << PNAMES[i] << "ErrPct: " << pctiMisidentified << endl;
+          cout << PNAMES[j] << "ErrPct: " << pctjMisidentified << endl;
         }
       }
     }
@@ -323,7 +327,7 @@ void identifyParticle(TH2D* eventHist, double particleMom, TVector3 pos0, TVecto
   vector<double> loglikes;
   for (int particleId = 0; particleId < NUMPARTICLES; particleId++) {
     // calculate within 2 standard deviations of each particle hypothesis
-    cout << "Guess: " << pNames[particleId] << endl;
+    cout << "Guess: " << PNAMES[particleId] << endl;
     for (int i = -2; i < 3; i++) {
       double betaGuess = calcBeta(particleId, particleMom + i*errMom);
       cout << "Beta: " << betaGuess << endl;
@@ -348,19 +352,64 @@ void testIdentifyParticle(int particlei, double particleMom, TVector3 pos0, TVec
 }
 
 
-void identifyMultiParticle(TH2D* eventHist, int nParticles, vector<int> particleis, vector<double> particleMoms,
+void identifyMultiParticle(TH2D* eventHist, int nDetected, vector<int> particleis, vector<double> particleMoms,
                            vector<TVector3> pos0s, vector<TVector3> dir0s, double errMom=0.5) {
-  // Run multidimensional particle identification 
+  /*
+  Run multidimensional particle identification
+  */
   THStack *hs = new THStack("pdfStack","");
-  for (int i = 0; i < nParticles; i++) {
-    double realBeta = calcBeta(particleis[i], particleMoms[i]);
-    hs->Add(Arich::calculatePdf(pos0s[i], dir0s[i], realBeta));
+
+  // Calculate a PDF for each individual detected particle, for each hypothesis
+  vector< vector<TH2D*> > calculatedPdfs;
+  for (int i = 0; i < nDetected; i++) {
+    vector<TH2D*> particleiCalculatedPdfs;
+    for (int p = 0; p < NUMPARTICLES; p++) {
+      double betaGuess = calcBeta(p, particleMoms[i]);
+      particleiCalculatedPdfs.push_back(Arich::calculatePdf(pos0s[i], dir0s[i], betaGuess, Form("pdf_%i_%i", i, p)));
+    }
+    calculatedPdfs.push_back(particleiCalculatedPdfs);
   }
-  hs->GetStack()->Last()->SaveAs("./output/stackedPdfs.root");
+
+  // Loop over every possible combination of particles
+  int numCombinations = TMath::Power(NUMPARTICLES, nDetected);
+  double minLoglikelihood = 1E10;
+  int bestCombination[nDetected];
+  for (int i = 0; i < numCombinations; i++) {
+    int index = i;
+    int combination[nDetected];
+    for (int k=nDetected-1; k>=0; k--) {
+      combination[k] = index % NUMPARTICLES;
+      index = index / NUMPARTICLES;
+    }
+
+    delete hs;
+    hs = new THStack("pdfStack","");
+    // Compute loglikelihood of the particle combination
+    for (int j = 0; j < nDetected; j++) {
+      hs->Add(calculatedPdfs[j][combination[j]]);
+    }
+    TH2D* stackedPdfs = (TH2D*) hs->GetStack()->Last();
+    stackedPdfs->SetName(Form("stackedPdfs%i",i));
+    stackedPdfs->SetTitle(Form("stackedPdfs%i",i));
+    double logLikelihood = computeLogLikelihood(eventHist, stackedPdfs);
+    if (logLikelihood < minLoglikelihood) {
+      // If this is the best loglikelihood so far, then copy it in
+      minLoglikelihood = logLikelihood;
+      for (int k = 0; k < nDetected; k++) {
+        bestCombination[k] = combination[k];
+      }
+    }
+    stackedPdfs->SaveAs(Form("./output/multitest/stackedPdfs%i.root", i));
+  }
+  cout << "Best Particle guess: ";
+  for (int i = 0; i < nDetected; i++) {
+    cout << PNAMES[bestCombination[i]] << " ";
+  }
+  cout << endl;
 
 }
 
-void testIdentifyMultiParticle(int nParticles) {
+void testIdentifyMultiParticle(int nDetected) {
   // Simulate multiparticle event, and test our ability to identify it
   THStack histStack("eventStack","");
   vector<int> particles;
@@ -368,7 +417,7 @@ void testIdentifyMultiParticle(int nParticles) {
   vector<TVector3> dir0s;
   vector<double> moms;
   TRandom3 randomGen = TRandom3();
-  for (int i = 0; i < nParticles; i++) {
+  for (int i = 0; i < nDetected; i++) {
     int particlei = randomGen.Integer(NUMPARTICLES);
     double momentumi = randomGen.Gaus(10, 2);
     double betai = calcBeta(particlei, momentumi);
@@ -380,16 +429,23 @@ void testIdentifyMultiParticle(int nParticles) {
     }
     dir0i[2] = sqrt(1-dir0i[0]*dir0i[0]-dir0i[1]*dir0i[0]);
     pos0i[2] = 0;
-    histStack.Add(Arich::generateEvent(pos0i, dir0i, betai, false));
+    histStack.Add(Arich::generateEvent(pos0i, dir0i, betai, false, Form("generatedEvent%i", i)));
     particles.push_back(particlei);
     pos0s.push_back(pos0i);
     dir0s.push_back(dir0i);
     moms.push_back(momentumi);
   }
   TH2D* eventHist = (TH2D*) histStack.GetStack()->Last();
-  eventHist->SaveAs("./output/stackedEvents.root");
-  identifyMultiParticle(eventHist, nParticles, particles, moms, pos0s, dir0s);
+  eventHist->SetName("stackedEvents");
+  eventHist->SetTitle("stackedEvents");
+  eventHist->SaveAs("./output/multitest/stackedEvents.root");
 
+  cout << "True Particles: ";
+  for (int i = 0; i < nDetected; i++) {
+    cout << PNAMES[particles[i]] << " ";
+  }
+  cout << endl;
+  identifyMultiParticle(eventHist, nDetected, particles, moms, pos0s, dir0s);
 }
 
 int main(int argc, char *argv[]) {
@@ -398,7 +454,7 @@ int main(int argc, char *argv[]) {
          << "Make pdf given particle and momentum:  -g <pid> <mom> [xdir ydir xpos ypos]" << endl
          << "Make pdf given beta:                   -b [beta xdir ydir xpos ypos]" << endl
          << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl
-         << "Run multi-particle identification:     -mp <nparticles>" << endl
+         << "Run multi-particle identification:     -mp <nDetected>" << endl
          << "Make PDF given Geant4 TTree:           -gpdf <g4filename> <pid>" << endl
          << "Check loglikes for each particle:      -s <analysisdir> <mom> [xdir ydir xpos ypos]" << endl;
     return -1;
@@ -417,11 +473,11 @@ int main(int argc, char *argv[]) {
   bool g4 = false;
   TVector3 pos0;
   TVector3 dir0;
-  int nParticles = 0;
+  int nDetected = 0;
   int argi = 2;
 
   if (mode == "-mp") {
-    nParticles = atoi(argv[argi]);
+    nDetected = atoi(argv[argi]);
     argi = argi + 1;
   }
   if (mode == "-gpdf") {
@@ -434,7 +490,7 @@ int main(int argc, char *argv[]) {
   }
   if (mode ==  "-g" || mode == "-p" || mode == "-gpdf") {
     particlei = atoi(argv[argi]);
-    cout << "Particle: " << pNames[particlei] << endl;
+    cout << "Particle: " << PNAMES[particlei] << endl;
     argi = argi + 1;
   }
   if (mode ==  "-g" || mode == "-p" || mode == "-s" || mode == "-sd") {
@@ -469,7 +525,7 @@ int main(int argc, char *argv[]) {
   // Do the thing
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
   if (mode == "-mp") {
-    testIdentifyMultiParticle(nParticles);
+    testIdentifyMultiParticle(nDetected);
   }
   if (mode == "-g" || mode == "-b") {
     // Given particle and momentum, simulate centered beam à la Geant4
@@ -477,7 +533,9 @@ int main(int argc, char *argv[]) {
       beta = calcBeta(particlei, particleMom);
       cout << "Beta: " << beta << endl;
     }
+    //Arich::generateEvent(pos0, dir0, beta, true);
     Arich::simulateBeam(pos0, dir0, beta);
+    //Arich::calculatePdf(pos0, dir0, beta);
   }
 
   if (mode == "-p") {
@@ -485,7 +543,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (mode == "-s") {
-    calculateAllLoglikes(particleMom, pos0, dir0, analysisDir);
+    calculateSeparationHists(particleMom, pos0, dir0, analysisDir);
   }
 
   if (mode == "-gpdf") {

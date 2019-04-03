@@ -82,8 +82,8 @@ private:
   static double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel);
 
 public:
-  static TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta);
-  static TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save = true);
+  static TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, char* histName="photonHist");
+  static TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save=true, char* histName="generatedEvent");
   static TH2D* simulateBeam(TVector3 pos0, TVector3 dir0, double beta);
 };
 

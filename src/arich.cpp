@@ -54,7 +54,7 @@ double Arich::integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta,
 
 
 
-TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
+TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta, char* histName) {
   // Make beam
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   // Make Aerogel layer
@@ -66,7 +66,7 @@ TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   // Make the detector
   Detector* detector = new Detector(detectorDist);
   // Get hist ready
-  TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
+  TH2D *photonHist = detector->makeDetectorHist(histName, histName);
   // Make events and loop over them
   for (int i = 0; i < nEvents; i++) {
     Particle *pa = beam->generateParticle();
@@ -109,7 +109,7 @@ TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta) {
   return photonHist;
 }
 
-TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save) {
+TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save, char* histName) {
   // Generate a single particle event
   Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
   Particle *pa = beam->generateParticle();
@@ -142,16 +142,16 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save)
   int numPhotonsDetected = (int) (detector->getFillFactor() * photons.size());
   photons.resize(numPhotonsDetected);
   // Project photons onto detector and plot distribution
-  TH2D *photonHist = detector->makeDetectorHist("generatedEvent","generatedEvent");
+  TH2D *photonHist = detector->makeDetectorHist(histName,histName);
   detector->projectPhotons(photonHist, photons);
   if (save) {
     // Draw out photon histogram and ellipse outline
     TCanvas *c1 = new TCanvas("c1","c1",900,900);
     double nPhotons = Arich::integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
     cout << "SINGLE EXAMPLE EVENT: Integrated number of photons in ring: " << nPhotons << endl;
-    photonHist->SaveAs("./output/generatedEvent.root");
+    photonHist->SaveAs(Form("./output/%s.root", histName));
     photonHist->Draw("colz");
-    c1->SaveAs("./output/generatedEvent.pdf");
+    c1->SaveAs(Form("./output/%s.pdf", histName));
   }
 
   return photonHist;
@@ -170,7 +170,6 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   Detector* detector = new Detector(detectorDist, true);
 
   // Get plots ready
-  //TH2D *photonHist = new TH2D("photonHist","photonHist",200,-20,20,200,-20,20);
   TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
 
   photonHist->SetXTitle("x [cm]");
