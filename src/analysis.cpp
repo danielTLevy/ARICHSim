@@ -127,8 +127,6 @@ void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char
   tree->Branch("kloglike",&kloglike,"kloglike/D");
   tree->Branch("ploglike",&ploglike,"ploglike/D");
 
-
-
   // First generate 3 particle hypothesis
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
@@ -198,7 +196,53 @@ void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char
   tree->Write();
 }
 
+void generateKaonMultiHists(char* analysisDir, char* fileName) {
+  // Read Geant4 file, save all photon events where kaons enter aerogel
+  TFile* g4File = TFile::Open(Form("%s%s.root", analysisDir, fileName));
+  TTree* h1000 = (TTree*) g4File->Get("h1000");
+  // Get "Interesting" events, where Kaons go into aerogel
+  int nKaonEvents = h1000->Draw("EventNumber", "Pid==321 && StateID==17");
+  double* eventNumbers = h1000->GetV1();
+  std::deque<int> kaonEventNumbers(h1000->GetV1(), h1000->GetV1()+nKaonEvents);
 
+  TTreeReader reader("h1000", g4File);
+  TTreeReaderValue<Int_t> rvEvent(reader, "EventNumber");
+  TTreeReaderValue<Int_t> rvPid(reader, "Pid");
+  TTreeReaderArray<Double_t> raMom(reader, "Mom");
+  TTreeReaderArray<Double_t> raPos(reader, "Pos");
+  TTreeReaderArray<Double_t> raDir(reader, "Dir");
+  TRandom3 randomGen = TRandom3();
+  Detector* detector = new Detector(0);
+  TH2D *g4EventHist = new TH2D("g4EventHist","g4EventHist",48,-15,15,48,-15,15);
+  int currEventId = kaonEventNumbers.front();
+  kaonEventNumbers.pop_front();
+  while (reader.Next() && !kaonEventNumbers.empty()) {
+    // Get only forward-exiting optical photons
+    if (*rvPid != 0 || raPos[2] < 829.99 ) {
+        continue;
+    }
+    if (*rvEvent ==  kaonEventNumbers.front()) {
+      g4EventHist->SaveAs(Form("%sExample%d.root", analysisDir, *rvEvent));
+      g4EventHist->Reset();
+      currEventId = kaonEventNumbers.front();
+      kaonEventNumbers.pop_front();
+    }
+    if (*rvEvent == currEventId) {
+       // Fill our event Histogram
+      // Momentum in GeV/c:
+      double momMag = sqrt(raMom[0]*raMom[0] + raMom[1]*raMom[1] + raMom[2]*raMom[2]);
+      // Wavelength in m
+      double wav = SPEEDOFLIGHT * PLANCKSCONST / (1E9 * momMag);
+      double efficiency = DETECTORFILL * detector->evalQEff(wav);
+      if ( randomGen.Uniform() < efficiency) {
+        // Project onto detector, and convert from mm to cm
+        double xFinal = 0.1*(raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2]);
+        double yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
+        g4EventHist->Fill(xFinal, yFinal);
+      }
+    }
+  }
+}
 
 void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, char* analysisDir) {
   /*
@@ -282,6 +326,7 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
         g4EventHist->Reset();
         currEventId = *rvEvent;
       }
+
       // Fill our event Histogram
       // Momentum in GeV/c:
       double momMag = sqrt(raMom[0]*raMom[0] + raMom[1]*raMom[1] + raMom[2]*raMom[2]);
@@ -296,7 +341,6 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
         g4Pdf->Fill(xFinal, yFinal);
       }
     }
-    g4Pdf->SaveAs(Form("%s%s.root", analysisDir, g4PdfName));
   }
   // Save the output for each of the ratios.
   TFile *likelihoodFile = new TFile(Form("%s/likelihoods.root", analysisDir), "RECREATE"); 
@@ -376,22 +420,26 @@ void identifyMultiParticle(TH2D* eventHist, int nDetected, vector<int> particlei
   int bestCombination[nDetected];
   for (int i = 0; i < numCombinations; i++) {
     int index = i;
-    int combination[nDetected];
-    for (int k=nDetected-1; k>=0; k--) {
-      combination[k] = index % NUMPARTICLES;
-      index = index / NUMPARTICLES;
-    }
-
     delete hs;
     hs = new THStack("pdfStack","");
-    // Compute loglikelihood of the particle combination
-    for (int j = 0; j < nDetected; j++) {
-      hs->Add(calculatedPdfs[j][combination[j]]);
+    char* stackedTitle = Form("PDF%i", i);
+    int combination[nDetected];
+    for (int k=nDetected-1; k>=0; k--) {
+      // Get particle based off index number
+      int p = index % NUMPARTICLES;
+      index = index / NUMPARTICLES;
+      // Add corresponding particle to hist stack
+      combination[k] = p;
+      stackedTitle = Form("%s_%s", stackedTitle, PNAMES[p]);
+      hs->Add(calculatedPdfs[k][p]);
+      cout << PNAMES[p];
     }
+    // Compute loglikelihood of the particle combination
     TH2D* stackedPdfs = (TH2D*) hs->GetStack()->Last();
-    stackedPdfs->SetName(Form("stackedPdfs%i",i));
-    stackedPdfs->SetTitle(Form("stackedPdfs%i",i));
+    stackedPdfs->SetName(stackedTitle);
+    stackedPdfs->SetTitle(stackedTitle);
     double logLikelihood = computeLogLikelihood(eventHist, stackedPdfs);
+    cout << "\t Loglike: " << logLikelihood << endl;
     if (logLikelihood < minLoglikelihood) {
       // If this is the best loglikelihood so far, then copy it in
       minLoglikelihood = logLikelihood;
@@ -448,6 +496,7 @@ void testIdentifyMultiParticle(int nDetected) {
   identifyMultiParticle(eventHist, nDetected, particles, moms, pos0s, dir0s);
 }
 
+
 int main(int argc, char *argv[]) {
   if (argc == 1) {
     cerr << "Usage: " << argv[0] << endl
@@ -470,6 +519,7 @@ int main(int argc, char *argv[]) {
   double particleMom = 0;
   TFile *g4File = nullptr;
   char* analysisDir;
+  char* fileName;
   bool g4 = false;
   TVector3 pos0;
   TVector3 dir0;
@@ -484,8 +534,12 @@ int main(int argc, char *argv[]) {
     g4File = TFile::Open(argv[argi]);
     argi = argi + 1;
   }
-  if (mode == "-s") {
+  if (mode == "-s" || mode == "-km") {
     analysisDir = argv[argi];
+    argi = argi + 1;
+  }
+  if (mode == "-km") {
+    fileName = argv[argi];
     argi = argi + 1;
   }
   if (mode ==  "-g" || mode == "-p" || mode == "-gpdf") {
@@ -549,6 +603,11 @@ int main(int argc, char *argv[]) {
   if (mode == "-gpdf") {
     geant4Pdf(g4File, particlei);
   }
+
+  if (mode == "-km") {
+    generateKaonMultiHists(analysisDir, fileName);
+  }
+
 
   auto duration = duration_cast<microseconds>( high_resolution_clock::now() - t1 ).count();
   cout << "Time taken: " << duration / 1000000. << endl;

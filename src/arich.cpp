@@ -167,7 +167,8 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
   // Make the detector
-  Detector* detector = new Detector(detectorDist, true);
+  bool mirror = false;
+  Detector* detector = new Detector(detectorDist, mirror);
 
   // Get plots ready
   TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
@@ -211,6 +212,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
     aerogel2->applyPhotonScatters(photons);
     aerogel2->exitAerogel(photons, refract);
     // Do some more scattering
+
     aerogel1->applyPhotonScatters(photons);
     aerogel1->exitAerogel(photons, refract);
     aerogel2->applyPhotonScatters(photons);
