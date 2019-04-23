@@ -34,7 +34,6 @@ private:
   static double calcChAngle(double, double);
   std::vector<double> getRandomTheta(int);
   std::vector<double> getRandomEnergy(int, double, double);
-  static TF1* calcWavPdf(double, double);
   static double calcdNdX(double, double);
   double getRandomWav();
   double getRandomScatAngle();

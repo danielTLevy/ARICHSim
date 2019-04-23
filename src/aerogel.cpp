@@ -11,8 +11,8 @@ Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double b
   this->refractiveIndex = refractiveIndex;
   this->zPos = zPos;
   this->chAngle = calcChAngle(refractiveIndex, beta);
-  this->wavPdf = calcWavPdf(refractiveIndex, beta);
-  this->scatAngleFunc = new TF1("scatPdf", "1 + x*x", -1, 1);
+  this->wavPdf = new TF1("wavPdf", "1/(x*x)", lowWav, highWav);
+  this->scatAngleFunc = new TF1("scatPdf", "1 + cos(x)*cos(x)", 0, TMath::Pi());
   this->dNdX = calcdNdX(refractiveIndex, beta);
   this->interactionLengths = readInteractionLength(refractiveIndex);
 }
@@ -23,13 +23,6 @@ double Aerogel::getChAngle() {
 
 double Aerogel::calcChAngle(double n, double beta) {
   return acos(1.0 / (n * beta));
-}
-
-TF1* Aerogel::calcWavPdf(double n, double beta) {
-  TF1 *pdf = new TF1("pdf", "(1. - 1./([0]*[1]*[0]*[1]))/(x*x)", lowWav, highWav);
-  pdf->SetParameter(0, n); pdf->SetParName(0, "n");
-  pdf->SetParameter(1, beta); pdf->SetParName(1, "beta");
-  return pdf;
 }
 
 double Aerogel::calcdNdX(double n, double beta) {
@@ -77,7 +70,17 @@ void Aerogel::setDownIndex(double n) {
 }
 
 double Aerogel::getRandomWav() {
-  return wavPdf->GetRandom();
+  /*
+  Use inverse transerve sampling to get random wavelength
+  wavelength PDF is proportional to 1/wav^2
+  Normalized wavelength pdf: P = (1/(1/lowWav - 1/highWav))*(1/wav^2)
+  Integrate, get CDF: C = (1/(1/lowWav - 1/highWav))*(1/lowWav - 1/wav)
+  Inverse of CDF: wav = 1/(1/lowWav - (1/lowWav - 1/highWav) * C)
+  If we sample C from 0 to 1, we can get a random wavelength sample
+  This is about twice as fast as just randomly sampling from 1/wav^2
+  */
+  double u = randomGenerate->Uniform(0,1);
+  return 1./(1./lowWav - (1./lowWav - 1./highWav)*u);
 }
 
 double Aerogel::getThickness() {
@@ -179,8 +182,10 @@ double Aerogel::getRandomIntDistance(double wav) {
 
 double Aerogel::getRandomScatAngle() {
   // Rayleigh scattering is proportional to  1 + cos^2(theta)
-  return TMath::ACos(scatAngleFunc->GetRandom());
+  return scatAngleFunc->GetRandom();
 }
+
+
 
 void Aerogel::applyPhotonScatter(Photon* photon) {
   // Continuously scatter photon while the distance travelled before interacting
