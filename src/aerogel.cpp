@@ -4,32 +4,65 @@ const double lowWav = 248E-9;
 const double highWav = 775E-9;
 const double fineStructConst = 1./137;
 
-Aerogel::Aerogel(double thickness, double refractiveIndex, double zPos, double beta) {
+Aerogel::Aerogel(double refractiveIndex, double thickness,  double zPos) {
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
   this->thickness = thickness;
-  this->refractiveIndex = refractiveIndex;
+  this->refracIndex = refractiveIndex;
   this->zPos = zPos;
-  this->chAngle = calcChAngle(refractiveIndex, beta);
   this->wavPdf = new TF1("wavPdf", "1/(x*x)", lowWav, highWav);
   this->scatAngleFunc = new TF1("scatPdf", "1 + cos(x)*cos(x)", 0, TMath::Pi());
-  this->dNdX = calcdNdX(refractiveIndex, beta);
   this->interactionLengths = readInteractionLength(refractiveIndex);
 }
 
-double Aerogel::getChAngle() {
-  return this->chAngle;
+
+double Aerogel::getThickness() {
+  return thickness;
 }
 
-double Aerogel::calcChAngle(double n, double beta) {
-  return acos(1.0 / (n * beta));
+double Aerogel::getRefractiveIndex() {
+  return refracIndex;
 }
 
-double Aerogel::calcdNdX(double n, double beta) {
-  return 2*TMath::Pi()*fineStructConst*(1. - 1./(n*beta*n*beta))*(1./lowWav - 1./highWav);
+double Aerogel::getZPos() {
+  return zPos;
+}
+
+void Aerogel::setUpIndex(double n) {
+  /*
+  Note refractive index of upstream material
+  */
+  this->upIndex = n;
+}
+
+void Aerogel::setDownIndex(double n) {
+  /*
+  Note refractive index of downstream material
+  */
+  this->downIndex = n;
+}
+
+double Aerogel::calcChAngle(double beta) {
+  /*
+  Calculate Cherenkov angle
+  */
+  return acos(1.0 / (refracIndex * beta));
+}
+
+double Aerogel::calcdNdX(double beta) {
+  /*
+  Integrate over wavelength range to get dN/dx,
+  the number of photons emitted per unit length
+  */
+  double constTerm = 2*TMath::Pi()*fineStructConst;
+  double nbeta = refracIndex*beta;
+  return constTerm*(1. - 1./(nbeta*nbeta))*(1./lowWav - 1./highWav);
 }
 
 std::vector<double> Aerogel::readInteractionLength(double n) {
+  /*
+  Read Aerogel interaction lengths from file in data folder 
+  */
   std::string files[5] = {"leps1-1b","btr4-1a","hds2-3b","leps2-1a","leps6-1a"};
   float ns[5] = {1.0505,1.0452,1.0401,1.0352,1.0297};
   // Get nearest index of refraction
@@ -60,42 +93,25 @@ std::vector<double> Aerogel::readInteractionLength(double n) {
   return intLengths;
 }
 
-
-void Aerogel::setUpIndex(double n) {
-  this->upIndex = n;
-}
-
-void Aerogel::setDownIndex(double n) {
-  this->downIndex = n;
-}
-
 double Aerogel::getRandomWav() {
   /*
-  Use inverse transerve sampling to get random wavelength
-  wavelength PDF is proportional to 1/wav^2
-  Normalized wavelength pdf: P = (1/(1/lowWav - 1/highWav))*(1/wav^2)
-  Integrate, get CDF: C = (1/(1/lowWav - 1/highWav))*(1/lowWav - 1/wav)
-  Inverse of CDF: wav = 1/(1/lowWav - (1/lowWav - 1/highWav) * C)
-  If we sample C from 0 to 1, we can get a random wavelength sample
+  Use inverse transform sampling to get random wavelength.
+  1) Wavelength PDF is proportional to 1/wav^2
+  2) Normalized wavelength pdf: P = (1/(1/lowWav - 1/highWav))*(1/wav^2)
+  3) Integrate, get CDF: C = (1/(1/lowWav - 1/highWav))*(1/lowWav - 1/wav)
+  4) Inverse of CDF: wav = 1/(1/lowWav - (1/lowWav - 1/highWav) * C)
+  5) If we sample C from 0 to 1, we can get a random wavelength sample
   This is about twice as fast as just randomly sampling from 1/wav^2
   */
   double u = randomGenerate->Uniform(0,1);
   return 1./(1./lowWav - (1./lowWav - 1./highWav)*u);
 }
 
-double Aerogel::getThickness() {
-  return thickness;
-}
-
-double Aerogel::getRefractiveIndex() {
-  return refractiveIndex;
-}
-
-double Aerogel::getZPos() {
-  return zPos;
-}
 
 bool Aerogel::isInAerogel(TVector3 pos) {
+  /*
+  Check if given position is in aerogel
+  */
   return (TMath::Abs(pos[0]) <= width/2.)
           && (TMath::Abs(pos[1]) <= height/2.)
           && ((pos[2] - zPos) <= thickness)
@@ -103,12 +119,16 @@ bool Aerogel::isInAerogel(TVector3 pos) {
 }
 
 double Aerogel::getDistInGel(Particle* pa) {
-  // calculate how far a particle has remaining in the gel
+  /* 
+  Calculate how far a particle has remaining in the gel
+  */
   return abs((zPos + thickness - pa->pos[2]) / pa->dir[2]);
 }
 
 void Aerogel::exitAerogel(Photon* ph, bool refract) {
-  // Advance photon to edge of aerogel and refract
+  /*
+  Advance photon to closest edge of aerogel in direction of travel and refract
+  */
 
   // Get distance to each wall in direction of travel
   double xDist = (TMath::Sign(width/2, ph->dir[0]) - ph->pos[0]) / ph->dir[0];
@@ -141,11 +161,14 @@ void Aerogel::exitAerogel(Photon* ph, bool refract) {
       }
     }
     // Refract the light
-     ph->dir = refractedDirection(ph->dir, incidentPlane, refractiveIndex, n2);
+     ph->dir = refractedDirection(ph->dir, incidentPlane, refracIndex, n2);
   }
 }
 
 void Aerogel::exitAerogel(std::vector<Photon*> photons, bool refract) {
+  /*
+  Exit and refract all photons that are still in the aerogel
+  */
   for(int i = 0; i < photons.size(); i++) {
     Photon* photon = photons[i];
     if (isInAerogel(photon->pos)) {
@@ -155,9 +178,11 @@ void Aerogel::exitAerogel(std::vector<Photon*> photons, bool refract) {
   }
 }
 
-int Aerogel::calcNumPhotons(double particleDist) {
-  // N ~= dN/dX * X (in meters)
-  return (int) particleDist*0.01*dNdX;
+int Aerogel::calcNumPhotons(double particleDist, double beta) {
+  /*
+  number of photons: N ~= dN/dX * X (in meters)
+  */
+  return (int) particleDist*0.01*calcdNdX(beta);
 }
 
 double Aerogel::getIntLengthForWav(double wav) {
@@ -171,25 +196,30 @@ double Aerogel::getIntLengthForWav(double wav) {
 }
 
 double Aerogel::getRandomIntDistance(double wav) {
+  /*
+  Inverse Transform Sampling:
+  Our CDF of whether photon has interacted is 1 - exp(- x / interactionL)
+  Sample randomly for value of CDF
+  Invert the equation to get the x value that would get yield random value
+  */
   double intLength = getIntLengthForWav(wav);
-  // Inverse Transform Sampling:
-  // Our CDF of whether photon has interacted is 1 - exp(- x / interactionL)
-  // Sample randomly for value of CDF
-  // Invert the equation to get the x value that would get this random value
   double randY = randomGenerate->Uniform(0,1);
   return - intLength * log(1. - randY);
 }
 
 double Aerogel::getRandomScatAngle() {
-  // Rayleigh scattering is proportional to  1 + cos^2(theta)
+  /*
+  Rayleigh scattering is proportional to  1 + cos^2(theta)
+  */
   return scatAngleFunc->GetRandom();
 }
 
-
-
 void Aerogel::applyPhotonScatter(Photon* photon) {
-  // Continuously scatter photon while the distance travelled before interacting
-  // is less than the distance to exit the gel - update position and direction
+  /*
+  Continuously scatter photon while the "distance travelled before interacting"
+  is less than the distance to exit the aerogel - update position and direction
+  after each scattering event
+  */
   if (!isInAerogel(photon->pos)) {
     return;
   }
@@ -213,6 +243,9 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
 }
 
 void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
+  /*
+  Scatter all photons in the aerogel
+  */
   for(int i = 0; i < photons.size(); i++) {
     Photon* photon = photons[i];
     if (isInAerogel(photon->pos)) {
@@ -223,12 +256,17 @@ void Aerogel::applyPhotonScatters(std::vector<Photon*> photons) {
 }
 
 std::vector<Photon*> Aerogel::generatePhotons(Particle* pa, Detector* detector) {
-  // Create Cherenkov photons as the particle passes through the gel
-  // Hacky, but requires detector
-  double paDist = getDistInGel(pa);
+  /* 
+  Create Cherenkov photons as the particle passes through the gel.
+  Hacky, but requires detector to immediately reject based off detector efficiency,
+  which saves on time spent computing photons that wouldn't be detected anyways
+  */
 
+  double beta = pa->beta;
+  double paDist = getDistInGel(pa);
+  double chAngle = calcChAngle(beta);
   std::vector<Photon*> photons;
-  int nPhotons = calcNumPhotons(paDist);
+  int nPhotons = calcNumPhotons(paDist, beta);
   photons.reserve(nPhotons);
   for (int i = 0; i < nPhotons; i++) {
     // First decide if we want to throw it out yet, based of quantum efficiency
@@ -242,7 +280,9 @@ std::vector<Photon*> Aerogel::generatePhotons(Particle* pa, Detector* detector) 
       TVector3 phPos = pa->pos + phIntDist*pa->dir;
       // Get the direction of the new photon
       double phPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-      TVector3 dirCR = TVector3(sin(chAngle)*cos(phPhi), sin(chAngle)*sin(phPhi), cos(chAngle));
+      TVector3 dirCR = TVector3(sin(chAngle)*cos(phPhi),
+                                sin(chAngle)*sin(phPhi),
+                                cos(chAngle));
       // Rotate onto particle direction
       dirCR.RotateUz(pa->dir);
       Photon* photon = new Photon(phPos, dirCR, wav);

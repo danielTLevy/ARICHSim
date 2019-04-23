@@ -1,20 +1,12 @@
 #include "beam.h"
 
-Beam::Beam(TVector3 pos0, TVector3 dir0, double beta, double errX, double errY, double errDirX, double errDirY) {
+Beam::Beam(TVector3 pos0, TVector3 dir0, double beta) {
   this->pos0 = pos0;
   this->dir0 = dir0;
   this->beta = beta;
-  this->errX = errX;
-  this->errY = errY;
-  this->errDirX = errDirX;
-  this->errDirY = errDirY;
+
   randomGenerate=std::make_shared<TRandom3>();
   randomGenerate->SetSeed(0);
-  particles.reserve(10000);
-}
-
-double Beam::getBeta() {
-  return beta;
 }
 
 Particle* Beam::generateParticle() {
@@ -26,26 +18,5 @@ Particle* Beam::generateParticle() {
   double paDirZ =  sqrt(1 - paDirX*paDirX - paDirY*paDirY);
   TVector3 dir = TVector3(paDirX, paDirY, paDirZ);
 
-  return new Particle(pos, dir);
+  return new Particle(pos, dir, beta);
 }
-
-void Beam::makeParticles(int N) {
-  for (int i = 0; i < N; i++) {
-    particles.push_back(generateParticle());
-  }
-  n_particles = N;
-}
-
-Particle* Beam::getParticle(int i) {
-  return particles[i];
-}
-
-TH2D* Beam::plotParticles(double z) {
-  TH2D *beamHist = new TH2D("beamHist2","beamHist2",200,-15,15,200,-15,15);
-  for (int i = 0; i < n_particles; i++) {
-    Particle p = *particles[i];
-    double r = p.dist(z);
-    beamHist->Fill(p.pos[0]+r*p.dir[0], p.pos[1]+r*p.dir[1]);
-  }
-  return beamHist;
-}; 

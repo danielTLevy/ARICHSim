@@ -16,7 +16,7 @@
 
 class Aerogel {
 private:
-  double refractiveIndex=1.0;
+  double refracIndex=1.0;
   double thickness=0.0;
   double height=10.0;
   double width=10.0;
@@ -27,32 +27,30 @@ private:
   TF1 *wavPdf;
   TF1 *scatAngleFunc;
   std::shared_ptr<TRandom3> randomGenerate;
-  double dNdX;
   std::vector<double> interactionLengths;
 
   static std::vector<double> readInteractionLength(double);
-  static double calcChAngle(double, double);
   std::vector<double> getRandomTheta(int);
-  std::vector<double> getRandomEnergy(int, double, double);
-  static double calcdNdX(double, double);
+  double calcdNdX(double beta);
   double getRandomWav();
   double getRandomScatAngle();
   void refractPhoton(Photon*);
   void applyPhotonScatter(Photon*);
-  double getIntLengthForWav(double);
-  double getRandomIntDistance(double);
+  double getIntLengthForWav(double wav);
+  double getRandomIntDistance(double wav);
 
 public:
-  Aerogel(double, double, double, double);
-  int calcNumPhotons(double);
-  double getChAngle();
+  Aerogel(double refractiveIndex, double thickness, double zPos);
+  double calcChAngle(double beta);
   double getRefractiveIndex();
   double getThickness();
   double getZPos();
-  void setUpIndex(double);
-  void setDownIndex(double);
-  void exitAerogel(Photon*,  bool refract = true);
-  void exitAerogel(std::vector<Photon*>, bool refract = true);
+  void setUpIndex(double n);
+  void setDownIndex(double n);
+
+  int calcNumPhotons(double particleDist, double beta);
+  void exitAerogel(Photon* ph,  bool refract = true);
+  void exitAerogel(std::vector<Photon*> ph, bool refract = true);
   bool isInAerogel(TVector3);
   void applyPhotonScatters(std::vector<Photon*>);
   std::vector<Photon*> generatePhotons(Particle*, Detector*);

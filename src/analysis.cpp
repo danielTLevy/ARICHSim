@@ -103,7 +103,7 @@ void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char
   Requires an analysisDir, containing g4 ttrees for each particle
   Outputs each loglikelihood for each particle
   */
-
+  Arich* arich = new Arich();
   double mom = particleMom;
   double xdir = dir0[0];
   double ydir = dir0[1];
@@ -131,8 +131,11 @@ void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
     char* namei = (char*) PNAMES[i];
-    double betai = calcBeta(i, particleMom);
-    TH2D* particleiPdf = Arich::calculatePdf(pos0, dir0, betai);
+    particleInfoStruct hypothesis;
+    hypothesis.pos = pos0;
+    hypothesis.dir = dir0;
+    hypothesis.beta = calcBeta(i, particleMom);
+    TH2D* particleiPdf = arich->calculatePdf(hypothesis);
     particleiPdf->SetName(Form("%sPdf", namei));
     particleiPdf->SetTitle(Form("%s PDF", namei));
     particlePdfs[i] = particleiPdf;
@@ -253,11 +256,16 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
   */
 
   // First generate 3 particle hypothesis
+  Arich* arich = new Arich();
+  particleInfoStruct hypothesis;
+  hypothesis.pos = pos0;
+  hypothesis.dir = dir0;
   TH2D* particlePdfs[NUMPARTICLES];
   for (int i = 0; i < NUMPARTICLES; i++) {
     char* namei = (char*) PNAMES[i];
     double betai = calcBeta(i, particleMom);
-    TH2D* particleiPdf = Arich::calculatePdf(pos0, dir0, betai);
+    hypothesis.beta = betai;
+    TH2D* particleiPdf = arich->calculatePdf(hypothesis);
     particleiPdf->SetName(Form("%sPdf", namei));
     particleiPdf->SetTitle(Form("%s PDF", namei));
     particlePdfs[i] = particleiPdf;
@@ -369,13 +377,18 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
 void identifyParticle(TH2D* eventHist, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
   vector<double> betas;
   vector<double> loglikes;
+  Arich* arich = new Arich();
+  particleInfoStruct hypothesis;
+  hypothesis.pos = pos0;
+  hypothesis.dir = dir0;
   for (int particleId = 0; particleId < NUMPARTICLES; particleId++) {
     // calculate within 2 standard deviations of each particle hypothesis
     cout << "Guess: " << PNAMES[particleId] << endl;
     for (int i = -2; i < 3; i++) {
       double betaGuess = calcBeta(particleId, particleMom + i*errMom);
       cout << "Beta: " << betaGuess << endl;
-      TH2D *calculatedPdf = Arich::calculatePdf(pos0, dir0, betaGuess);
+      hypothesis.beta =  betaGuess;
+      TH2D *calculatedPdf = arich->calculatePdf(hypothesis);
       double logLikelihood = computeLogLikelihood(eventHist, calculatedPdf);
       delete calculatedPdf;
       cout << "logLikelihood: " << logLikelihood << endl << endl;
@@ -391,7 +404,12 @@ void testIdentifyParticle(int particlei, double particleMom, TVector3 pos0, TVec
   // Given particle, momentum, simulate example event, and see if we can identify it
   double realBeta = calcBeta(particlei, particleMom);
   cout << "Real Beta: " << realBeta << endl;
-  TH2D* generatedEvent = Arich::generateEvent(pos0, dir0, realBeta);
+  Arich* arich = new Arich();
+  particleInfoStruct params;
+  params.pos = pos0;
+  params.dir = dir0;
+  params.beta =  realBeta;
+  TH2D* generatedEvent = arich->generateEvent(params);
   identifyParticle(generatedEvent, particleMom, pos0, dir0);
 }
 
@@ -402,14 +420,17 @@ void identifyMultiParticle(TH2D* eventHist, int nDetected, vector<int> particlei
   Run multidimensional particle identification
   */
   THStack *hs = new THStack("pdfStack","");
-
+  Arich* arich = new Arich();
   // Calculate a PDF for each individual detected particle, for each hypothesis
   vector< vector<TH2D*> > calculatedPdfs;
   for (int i = 0; i < nDetected; i++) {
     vector<TH2D*> particleiCalculatedPdfs;
+    particleInfoStruct hypothesis;
+    hypothesis.pos = pos0s[i];
+    hypothesis.dir = dir0s[i];
     for (int p = 0; p < NUMPARTICLES; p++) {
-      double betaGuess = calcBeta(p, particleMoms[i]);
-      particleiCalculatedPdfs.push_back(Arich::calculatePdf(pos0s[i], dir0s[i], betaGuess, Form("pdf_%i_%i", i, p)));
+      hypothesis.beta =  calcBeta(p, particleMoms[i]);
+      particleiCalculatedPdfs.push_back(arich->calculatePdf(hypothesis, Form("pdf_%i_%i", i, p)));
     }
     calculatedPdfs.push_back(particleiCalculatedPdfs);
   }
@@ -464,6 +485,7 @@ void testIdentifyMultiParticle(int nDetected) {
   vector<TVector3> pos0s;
   vector<TVector3> dir0s;
   vector<double> moms;
+  Arich* arich = new Arich();
   TRandom3 randomGen = TRandom3();
   for (int i = 0; i < nDetected; i++) {
     int particlei = randomGen.Integer(NUMPARTICLES);
@@ -477,7 +499,13 @@ void testIdentifyMultiParticle(int nDetected) {
     }
     dir0i[2] = sqrt(1-dir0i[0]*dir0i[0]-dir0i[1]*dir0i[0]);
     pos0i[2] = 0;
-    histStack.Add(Arich::generateEvent(pos0i, dir0i, betai, false, Form("generatedEvent%i", i)));
+
+    particleInfoStruct hypothesis;
+    hypothesis.pos = pos0i;
+    hypothesis.dir = dir0i;
+    hypothesis.beta = betai;
+
+    histStack.Add(arich->generateEvent(hypothesis, false, Form("generatedEvent%i", i)));
     particles.push_back(particlei);
     pos0s.push_back(pos0i);
     dir0s.push_back(dir0i);
@@ -587,9 +615,14 @@ int main(int argc, char *argv[]) {
       beta = calcBeta(particlei, particleMom);
       cout << "Beta: " << beta << endl;
     }
-    //Arich::generateEvent(pos0, dir0, beta, true);
-    Arich::simulateBeam(pos0, dir0, beta);
-    //Arich::calculatePdf(pos0, dir0, beta);
+    Arich* arich = new Arich();
+    particleInfoStruct params;
+    params.pos = pos0;
+    params.dir = dir0;
+    params.beta = beta;
+    //arich->generateEvent(hypothesis, true);
+    arich->simulateBeam(params);
+    //arich->calculatePdf(hypothesis);
   }
 
   if (mode == "-p") {

@@ -1,19 +1,31 @@
 #include "arich.h"
 using namespace std;
 
-double Arich::integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel) {
-  // Define Ellipse and integrate over this ring
-  double dirX_0 = dir0[0];
-  double dirY_0 = dir0[1];
-  double dirZ_0 = dir0[2];
+Arich::Arich(bool mirror) {
+  this->aerogel1 = new Aerogel(n1, thickness, aeroPos1);
+  this->aerogel2 = new Aerogel(n2, thickness, aeroPos2);
+  this->detector = new Detector(detectorDist, mirror);
+  aerogel1->setDownIndex(n2);
+  aerogel2->setUpIndex(n1);
+}
 
+
+double Arich::integrateAndDrawEllipse(particleInfoStruct params, TH2D* photonHist, TPad* pad) {
+  /*
+    Draw an ellipse over a photonhist showing where particles are expected to go
+    Return number of photon hits found in this ring
+  */
+  // Define Ellipse and integrate over this ring
+  double dirX_0 = params.dir[0];
+  double dirY_0 = params.dir[1];
+  double dirZ_0 = params.dir[2];
   // Naively assume that all photons are generated in middle of second aerogel layer.
   double middlePoint = thickness + thickness / 2.;
-  double newX_0 = pos0[0] + middlePoint*dirX_0/dirZ_0;
-  double newY_0 = pos0[1] + middlePoint*dirY_0/dirZ_0;
+  double newX_0 = params.pos[0] + middlePoint*dirX_0/dirZ_0;
+  double newY_0 = params.pos[1] + middlePoint*dirY_0/dirZ_0;
   double newDist = detectorDist - middlePoint;
   double dirTheta =  atan(sqrt(dirX_0*dirX_0 +dirY_0*dirY_0) / dirZ_0);
-  double chAngle = aerogel->getChAngle();
+  double chAngle = aerogel2->calcChAngle(params.beta);
   // Calculate ellipse parameters
   double radiusA = 0.5*newDist*TMath::Abs(tan(dirTheta+chAngle) - tan(dirTheta-chAngle));
   double radiusB = 0.5*newDist*TMath::Abs(tan(chAngle) - tan(-chAngle));
@@ -54,17 +66,13 @@ double Arich::integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta,
 
 
 
-TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta, char* histName) {
-  // Make beam
-  Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
-  // Make Aerogel layer
-  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos1, beta);
-  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos2, beta);
-  // Make them aware of each other for refraction purposes
-  aerogel1->setDownIndex(n2);
-  aerogel2->setUpIndex(n1);
-  // Make the detector
-  Detector* detector = new Detector(detectorDist);
+TH2D* Arich::calculatePdf(particleInfoStruct params, char* histName) {
+  /*
+  Calculate mean distribution of photons over detector for given beta
+  */
+  // Number of events to simulate
+  int nEvents = 10000;
+  Beam* beam = new Beam(params.pos, params.dir, params.beta);
   // Get hist ready
   TH2D *photonHist = detector->makeDetectorHist(histName, histName);
   // Make events and loop over them
@@ -97,30 +105,16 @@ TH2D* Arich::calculatePdf(TVector3 pos0, TVector3 dir0, double beta, char* histN
     }
     delete pa;
   }
-
   // Scale photon histogram to the number of iterations
   photonHist->Scale(1. / nEvents);
   // Scale photon to fill factor of detector
   photonHist->Scale(detector->getFillFactor());
-  delete beam;
-  delete aerogel1;
-  delete aerogel2;
-  delete detector;
-  return photonHist;
 }
 
-TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save, char* histName) {
+TH2D* Arich::generateEvent(particleInfoStruct params, bool save, char* histName) {
   // Generate a single particle event
-  Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
+  Beam *beam = new Beam(params.pos, params.dir, params.beta);
   Particle *pa = beam->generateParticle();
-  // Make Aerogel layer
-  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos1, beta);
-  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos2, beta);
-  // Make them aware of each other for refraction purposes
-  aerogel1->setDownIndex(n2);
-  aerogel2->setUpIndex(n1);
-  // Make the detector
-  Detector* detector = new Detector(detectorDist);
   // Make photons in first aerogel
   std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
   bool refract = true;
@@ -147,7 +141,7 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save,
   if (save) {
     // Draw out photon histogram and ellipse outline
     TCanvas *c1 = new TCanvas("c1","c1",900,900);
-    double nPhotons = Arich::integrateAndDrawEllipse(pos0, dir0, beta, photonHist, c1, aerogel2);
+    double nPhotons = Arich::integrateAndDrawEllipse(params, photonHist, c1);
     cout << "SINGLE EXAMPLE EVENT: Integrated number of photons in ring: " << nPhotons << endl;
     photonHist->SaveAs(Form("./output/%s.root", histName));
     photonHist->Draw("colz");
@@ -157,19 +151,10 @@ TH2D* Arich::generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save,
   return photonHist;
 }
 
-TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
+TH2D* Arich::simulateBeam(particleInfoStruct params) {
+  double nEvents = 10000;
   // Make beam
-  Beam *beam = new Beam(pos0, dir0, beta, errX, errY, errDirX, errDirY);
-  // Make Aerogel layer
-  Aerogel* aerogel1 = new Aerogel(thickness, n1, aeroPos1, beta);
-  Aerogel* aerogel2 = new Aerogel(thickness, n2, aeroPos2, beta);
-  // Make them aware of each other for refraction purposes
-  aerogel1->setDownIndex(n2);
-  aerogel2->setUpIndex(n1);
-  // Make the detector
-  bool mirror = false;
-  Detector* detector = new Detector(detectorDist, mirror);
-
+  Beam *beam = new Beam(params.pos, params.dir, params.beta);
   // Get plots ready
   TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
 
@@ -197,7 +182,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
     paStruct.posz = pa->pos0[2];
     paStruct.id = i;
 
-    // Make photons in first aerogel
+    // Make photons in first aerogel 
     std::vector<Photon*> photons = aerogel1->generatePhotons(pa, detector);
     // Advance particle forward to next aerogel and generate photons
     pa->travelZDist(aeroPos2 - aeroPos1);
@@ -281,7 +266,7 @@ TH2D* Arich::simulateBeam(TVector3 pos0, TVector3 dir0, double beta) {
   photonHist->SetZTitle("Mean Photon Count");
   photonHist->Draw("colz");
 
-  double nPhotons = Arich::integrateAndDrawEllipse(pos0, dir0, beta, photonHist, center_pad, aerogel2);
+  double nPhotons = Arich::integrateAndDrawEllipse(params, photonHist, center_pad);
   cout << "PHOTON DISTRIBUTION: Integrated number of photons in ring: " << nPhotons << endl;
 
   right_pad->cd();

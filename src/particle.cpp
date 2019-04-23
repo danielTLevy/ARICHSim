@@ -1,10 +1,11 @@
 #include "particle.h"
 
-Particle::Particle(TVector3 pos, TVector3 dir) {
+Particle::Particle(TVector3 pos, TVector3 dir, double beta) {
   this->pos0 = pos;
   this->dir0 = dir;
   this->pos = pos;
   this->dir = dir;
+  this->beta = beta;
 }
 
 double Particle::theta() {
@@ -26,7 +27,6 @@ void Particle::travelDist(double dist) {
   pos[1] = pos[1] + dist*dir[1];
   pos[2] = pos[2] + dist*dir[2];
 }
-
 
 void Particle::travelZDist(double zDist) {
   // Travel some distance in the direction of travel

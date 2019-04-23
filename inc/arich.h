@@ -29,22 +29,11 @@
 #include "photon.h"
 #include "detector.h"
 
-class Arich {
-
-private:
-  static constexpr int nEvents = 10000;
-  static constexpr double aeroPos1 = 0.; // positions of aerogel planes
-  static constexpr double aeroPos2 = 2.;
-  static constexpr double thickness = 2.0; // thickness of aerogel layer
-  static constexpr double width = 10.; // x width of aerogel
-  static constexpr double height = 10.; // y height of aerogel
-  static constexpr double n1 = 1.0352; // outer index of refraction
-  static constexpr double n2 = 1.0452; // inner index of refraction
-  static constexpr double detectorDist = 21.0; // dist to detector plane
-  static constexpr double errDirX = 0.000; // beam direction error
-  static constexpr double errDirY = 0.000;
-  static constexpr double errX = 0.001; // beam position error
-  static constexpr double errY = 0.001;
+  struct particleInfoStruct {
+    TVector3 pos;
+    TVector3 dir;
+    double beta;
+  };
 
   struct photonStruct {
     // Initial direction and position
@@ -76,15 +65,34 @@ private:
     double posx;
     double posy;
     double posz;
+    double beta;
     int id;
   };
 
-  static double integrateAndDrawEllipse(TVector3 pos0, TVector3 dir0, double beta, TH2D* photonHist, TPad* pad, Aerogel* aerogel);
+class Arich {
+
+private:
+  static constexpr double aeroPos1 = 0.; // positions of aerogel planes
+  static constexpr double aeroPos2 = 2.;
+  static constexpr double thickness = 2.0; // thickness of aerogel layer
+  static constexpr double width = 10.; // x width of aerogel
+  static constexpr double height = 10.; // y height of aerogel
+  static constexpr double n1 = 1.0352; // outer index of refraction
+  static constexpr double n2 = 1.0452; // inner index of refraction
+  static constexpr double detectorDist = 21.0; // dist to detector plane
+
+  Beam* beam;
+  Aerogel* aerogel1;
+  Aerogel* aerogel2;
+  Detector* detector;
+
+  double integrateAndDrawEllipse(particleInfoStruct params, TH2D* photonHist, TPad* pad);
 
 public:
-  static TH2D* calculatePdf(TVector3 pos0, TVector3 dir0, double beta, char* histName="photonHist");
-  static TH2D* generateEvent(TVector3 pos0, TVector3 dir0, double beta, bool save=true, char* histName="generatedEvent");
-  static TH2D* simulateBeam(TVector3 pos0, TVector3 dir0, double beta);
+  Arich(bool mirror = false);
+  TH2D* calculatePdf(particleInfoStruct params, char* histName="photonHist");
+  TH2D* generateEvent(particleInfoStruct params, bool save=true, char* histName="generatedEvent");
+  TH2D* simulateBeam(particleInfoStruct params);
 };
 
 #endif

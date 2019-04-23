@@ -14,24 +14,15 @@ private:
   TVector3 pos0;
   TVector3 dir0;
   double beta;
-  // Todo: Better errs
-  double errX;
-  double errY;
-  double errDirX;
-  double errDirY;
-  std::vector<Particle*> particles;
+  static constexpr double errDirX = 0.000; // beam direction error
+  static constexpr double errDirY = 0.000;
+  static constexpr double errX = 0.001; // beam position error
+  static constexpr double errY = 0.001;
   std::shared_ptr<TRandom3> randomGenerate;
-  int n_particles = 0;
-
-
 
 public:
-  Beam(TVector3, TVector3, double, double, double, double, double);
-  double getBeta();
+  Beam(TVector3 pos0, TVector3 dir0, double beta);
   Particle* generateParticle();
-  Particle* getParticle(int i);
-  TH2D* plotParticles(double);
-  void makeParticles(int N);
 };
 
 #endif
