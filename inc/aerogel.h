@@ -7,7 +7,6 @@
 #include "TMath.h"
 #include "TF1.h"
 #include "TRandom3.h"
-#include "TSpline.h"
 #include "beam.h"
 #include "photon.h"
 #include "particle.h"

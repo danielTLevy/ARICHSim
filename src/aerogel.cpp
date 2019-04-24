@@ -10,7 +10,6 @@ Aerogel::Aerogel(double refractiveIndex, double thickness,  double zPos) {
   this->thickness = thickness;
   this->refracIndex = refractiveIndex;
   this->zPos = zPos;
-  this->wavPdf = new TF1("wavPdf", "1/(x*x)", lowWav, highWav);
   this->scatAngleFunc = new TF1("scatPdf", "1 + cos(x)*cos(x)", 0, TMath::Pi());
   this->interactionLengths = readInteractionLength(refractiveIndex);
 }

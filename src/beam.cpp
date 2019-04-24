@@ -10,6 +10,9 @@ Beam::Beam(TVector3 pos0, TVector3 dir0, double beta) {
 }
 
 Particle* Beam::generateParticle() {
+  /*
+  Return a particle with a randomly thrown direction and position
+  */
   double paX = pos0(0) + randomGenerate->Gaus(0.0, errX);
   double paY = pos0(1) + randomGenerate->Gaus(0.0, errY);
   TVector3 pos = TVector3(paX, paY, pos0(2));

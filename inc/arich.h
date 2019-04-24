@@ -6,7 +6,6 @@
 #include <TROOT.h>
 #include <TStyle.h>
 #include "TMath.h"
-#include "TF1.h"
 #include "TH1D.h"
 #include "TH2D.h"
 #include "TH3D.h"
@@ -14,7 +13,6 @@
 #include "TTree.h"
 #include "TTreeReader.h"
 #include "TTreeReaderArray.h"
-#include "TGraph.h"
 #include "TCanvas.h"
 #include "TRandom3.h"
 #include "TVector3.h"

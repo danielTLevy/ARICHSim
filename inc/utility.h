@@ -28,7 +28,7 @@ static TMatrixD makeRotationMatrix(TVector3 dir) {
   rot(0,1) =     - v[2] - (v[0]*v[1])          *k;
   rot(0,2) =     + v[1] + (v[0]*v[2])          *k;
   rot(1,0) =     + v[2] + (v[0]*v[1])          *k;
-  rot(1,1) = 1.0        - (v[2]*v[2]+v[0]*v[0])*k; 
+  rot(1,1) = 1.0        - (v[2]*v[2]+v[0]*v[0])*k;
   rot(1,2) =     - v[0] - (v[2]*v[1])          *k;
   rot(2,0) =     - v[1] - (v[0]*v[2])          *k;
   rot(2,1) =     + v[0] + (v[1]*v[2])          *k;
@@ -50,8 +50,10 @@ static TVector3 rotateVector(TMatrixD rot, double theta, double phi) {
 }
 
 static TVector3 refractedDirection(TVector3 l, TVector3 n, double n1, double n2) {
-  //From: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
-  // light w/ normalized direction l incident on surface w/ normal n, from indices n1 to n2
+  /*
+  From: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+  light w/ normalized direction l incident on surface w/ normal n, from indices n1 to n2
+  */
   double c = -l*n; // cos(theta1) = - l dot n
   double r = n1 / n2;
   return r*l + (r*c - sqrt(1-r*r*(1-c*c)))*n;
@@ -68,7 +70,7 @@ static TVector3 reflectedDirection(TVector3 l, TVector3 n) {
 
 static TCutG *createCutFromEllipse(TEllipse *ellipse) {
   /*
-  Return a TCutG, given a TEllipse shape
+  Return an elliptical TCutG, given a TEllipse
   */
   int np = 200;
   double angle,dx,dy;
