@@ -109,9 +109,10 @@ TH2D* Arich::calculatePdf(particleInfoStruct params, char* histName) {
   photonHist->Scale(1. / nEvents);
   // Scale photon to fill factor of detector
   photonHist->Scale(detector->getFillFactor());
+  return photonHist;
 }
 
-TH2D* Arich::generateEvent(particleInfoStruct params, bool save, char* histName) {
+TH2D* Arich::generateEvent(particleInfoStruct params, bool save, char* histName, char* outputDir) {
   /*
   Simulate a photon distribution resulting from a single particle
   */
@@ -143,11 +144,12 @@ TH2D* Arich::generateEvent(particleInfoStruct params, bool save, char* histName)
   if (save) {
     // Draw out photon histogram and ellipse outline
     TCanvas *c1 = new TCanvas("c1","c1",900,900);
+    gStyle->SetOptStat(0);
     double nPhotons = Arich::integrateAndDrawEllipse(params, photonHist, c1);
     cout << "SINGLE EXAMPLE EVENT: Integrated number of photons in ring: " << nPhotons << endl;
-    photonHist->SaveAs(Form("./output/%s.root", histName));
+    photonHist->SaveAs(Form("%s/%s.root", outputDir, histName));
     photonHist->Draw("colz");
-    c1->SaveAs(Form("./output/%s.pdf", histName));
+    c1->SaveAs(Form("%s/%s.pdf", outputDir, histName));
   }
 
   return photonHist;
@@ -163,7 +165,7 @@ TH2D* Arich::simulateBeam(particleInfoStruct params, char* outputDir) {
   Beam *beam = new Beam(params.pos, params.dir, params.beta);
 
   // Get plots ready
-  TFile *f = new TFile(Form("./output/%s.root", outputDir), "RECREATE");
+  TFile *f = new TFile(Form("%s.root", outputDir), "RECREATE");
   TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
   photonHist->SetXTitle("x [cm]");
   photonHist->SetYTitle("y [cm]");

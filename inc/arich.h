@@ -75,10 +75,8 @@ private:
   static constexpr double aeroPos2 = 2.;
   static constexpr double thickness1 = 2.0; // thickness of aerogel layers
   static constexpr double thickness2 = 2.0;
-  static constexpr double width = 10.; // x width of aerogel
-  static constexpr double height = 10.; // y height of aerogel
-  static constexpr double n1 = 1.0352; // outer index of refraction
-  static constexpr double n2 = 1.0452; // inner index of refraction
+  static constexpr double n1 = 1.0352; // upstream aerogel index of refraction
+  static constexpr double n2 = 1.0452; // downstream aerogel index of refraction
   static constexpr double detectorDist = 21.0; // dist to detector plane
 
   Aerogel* aerogel1;
@@ -90,7 +88,7 @@ private:
 public:
   Arich(bool mirror = false);
   TH2D* calculatePdf(particleInfoStruct params, char* histName="photonHist");
-  TH2D* generateEvent(particleInfoStruct params, bool save=true, char* histName="generatedEvent");
+  TH2D* generateEvent(particleInfoStruct params, bool save=true, char* histName="generatedEvent", char* outputDir="./output");
   TH2D* simulateBeam(particleInfoStruct params, char* outputDir="simulatedBeam");
 };
 

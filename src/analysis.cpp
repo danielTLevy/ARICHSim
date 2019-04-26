@@ -80,6 +80,7 @@ double computeLogLikelihood(TH2D* event, TH2D* distribution) {
   to give the likelihood of that event under that distribution
   */
   int nBins = event->GetSize();
+  int test = distribution->GetSize();
   if (nBins != distribution->GetSize()) {
       cerr << "ERROR: Bin Mismatch" << endl;
       throw "Bin Mismatch Error";
@@ -252,7 +253,7 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
   Compare each particle geant4 root file to a different simulated particle PDF
   //Requires an analysisDir in the out directory
     - This contains a directory "g4" which contains all the ttrees for the geant4
-  Outputs loglikelihood ratio for each particle pair, and .pdfs of the PDFs
+  Outputs loglikelihood ratio for each particle pair, and each of the PDFs
   */
 
   // First generate 3 particle hypothesis
@@ -374,34 +375,41 @@ void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, 
 }
 
 
-void identifyParticle(TH2D* eventHist, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
-  vector<double> betas;
+int identifyParticle(TH2D* eventHist, double particleMom, TVector3 pos0, TVector3 dir0, char* outputDir=nullptr) {
+  /*
+  Given histogram of photon distribution, return id of most likely particle that generated those photons
+  */
   vector<double> loglikes;
   Arich* arich = new Arich();
   particleInfoStruct hypothesis;
   hypothesis.pos = pos0;
   hypothesis.dir = dir0;
   for (int particleId = 0; particleId < NUMPARTICLES; particleId++) {
-    // calculate within 2 standard deviations of each particle hypothesis
-    cout << "Guess: " << PNAMES[particleId] << endl;
-    for (int i = -2; i < 3; i++) {
-      double betaGuess = calcBeta(particleId, particleMom + i*errMom);
-      cout << "Beta: " << betaGuess << endl;
-      hypothesis.beta =  betaGuess;
-      TH2D *calculatedPdf = arich->calculatePdf(hypothesis);
-      double logLikelihood = computeLogLikelihood(eventHist, calculatedPdf);
-      delete calculatedPdf;
-      cout << "logLikelihood: " << logLikelihood << endl << endl;
-      betas.push_back(betaGuess);
-      loglikes.push_back(logLikelihood);
+    char* particleName = (char*) PNAMES[particleId];
+    cout << "Guess: " << particleName << endl;
+    double betaGuess = calcBeta(particleId, particleMom);
+    cout << "Beta: " << betaGuess << endl;
+    hypothesis.beta = betaGuess;
+    TH2D *calculatedPdf = arich->calculatePdf(hypothesis, particleName);
+    double logLikelihood = computeLogLikelihood(eventHist, calculatedPdf);
+    if (outputDir) {
+      calculatedPdf->SaveAs(Form("%s/%s.root", outputDir, particleName));
     }
+    delete calculatedPdf;
+    cout << "logLikelihood: " << logLikelihood << endl << endl;
+    loglikes.push_back(logLikelihood);
   }
-  TGraph(betas.size(), &betas[0], &loglikes[0]).SaveAs("./output/Beta.root");
+
+  int pid =  TMath::LocMin(NUMPARTICLES, &loglikes[0]);
+  cout << "Minimum: " << PNAMES[pid] << endl;
+  return pid;
 }
 
 
-void testIdentifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, double errMom = 0.5) {
-  // Given particle, momentum, simulate example event, and see if we can identify it
+void testIdentifyParticle(int particlei, double particleMom, TVector3 pos0, TVector3 dir0, char* outputDir=nullptr) {
+  /*
+  Given particle, momentum, direction, and position, simulate an example event, and see if we can identify it
+  */
   double realBeta = calcBeta(particlei, particleMom);
   cout << "Real Beta: " << realBeta << endl;
   Arich* arich = new Arich();
@@ -409,8 +417,8 @@ void testIdentifyParticle(int particlei, double particleMom, TVector3 pos0, TVec
   params.pos = pos0;
   params.dir = dir0;
   params.beta =  realBeta;
-  TH2D* generatedEvent = arich->generateEvent(params);
-  identifyParticle(generatedEvent, particleMom, pos0, dir0);
+  TH2D* generatedEvent = arich->generateEvent(params, true, "generatedEvent", outputDir);
+  identifyParticle(generatedEvent, particleMom, pos0, dir0, outputDir);
 }
 
 
@@ -516,7 +524,6 @@ void testIdentifyMultiParticle(int nDetected) {
     hypothesis.beta = betai;
     // Generate resulting photon distribution
     histStack.Add(arich->generateEvent(hypothesis, false, Form("generatedEvent%i", i)));
-
   }
   // Save summed photon distribution
   TH2D* eventHist = (TH2D*) histStack.GetStack()->Last();
@@ -536,10 +543,11 @@ void testIdentifyMultiParticle(int nDetected) {
 int main(int argc, char *argv[]) {
   if (argc == 1) {
     cerr << "Usage: " << argv[0] << endl
-         << "Make pdf given particle and momentum:  -g <outputdir> <pid> <mom> [xdir ydir xpos ypos]" << endl
-         << "Make pdf given beta:                   -b [beta xdir ydir xpos ypos]" << endl
-         << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl
-         << "Run multi-particle identification:     -mp <nDetected>" << endl
+         << "Make pdf given beta:                   -b <outputdir> <beta> [xdir ydir xpos ypos]" << endl
+         << "Make pdf given particle and momentum:  -p <outputdir> <pid> <mom> [xdir ydir xpos ypos]" << endl
+         << "Test particle identification:          -pid <pid> <mom> [xdir ydir xpos ypos]" << endl
+         << "Test multi-particle identification:    -mp <nDetected>" << endl
+         << "Identify from photon histogram:        -id <eventFile> <histname> <mom> <xdir> <ydir> <xpos> <ypos>" << endl        
          << "Make PDF given Geant4 TTree:           -gpdf <g4filename> <pid>" << endl
          << "Check loglikes for each particle:      -s <analysisdir> <mom> [xdir ydir xpos ypos]" << endl;
     return -1;
@@ -548,20 +556,22 @@ int main(int argc, char *argv[]) {
   string mode = string(argv[1]);
 
   // Set particle parameters
-  double beta = 0.999; // velocity of particle
-  double dirX_0, dirY_0, x_0, y_0 ;
-  dirX_0 = dirY_0 = x_0 = y_0 = 0;
+  double beta = 1.; // velocity of particle
+  double xdir, ydir, xpos, ypos ;
+  xdir = ydir = xpos = ypos = 0;
   int particlei = 0;
   double particleMom = 0;
   TFile *g4File = nullptr;
-  char* analysisDir;
+  char* outputDir;
   char* fileName;
+  char* histName;
   bool g4 = false;
   TVector3 pos0;
   TVector3 dir0;
   int nDetected = 0;
   int argi = 2;
 
+  // Load up arguments
   if (mode == "-mp") {
     nDetected = atoi(argv[argi]);
     argi = argi + 1;
@@ -570,46 +580,47 @@ int main(int argc, char *argv[]) {
     g4File = TFile::Open(argv[argi]);
     argi = argi + 1;
   }
-  if (mode == "-s" || mode == "-km" || mode=="-g") {
-    analysisDir = argv[argi];
+  if (mode=="-p" || mode=="-b" ||mode == "-s" || mode == "-km" || mode=="-g" || mode == "-pid") {
+    outputDir = argv[argi];
     argi = argi + 1;
   }
-  if (mode == "-km") {
+  if (mode == "-km" || mode == "-id") {
     fileName = argv[argi];
-    argi = argi + 1;
+    histName = argv[argi+1];
+    argi = argi + 2;
   }
-  if (mode ==  "-g" || mode == "-p" || mode == "-gpdf") {
+  if (mode ==  "-p" || mode == "-pid" || mode == "-gpdf") {
     particlei = atoi(argv[argi]);
     cout << "Particle: " << PNAMES[particlei] << endl;
     argi = argi + 1;
   }
-  if (mode ==  "-g" || mode == "-p" || mode == "-s" || mode == "-sd") {
+  if (mode ==  "-p" || mode == "-pid" || mode == "-s" || mode == "-id") {
     particleMom = atof(argv[argi]);
     cout << "Mom: " << particleMom << endl;
     argi = argi + 1;
   }
-  if (mode == "-b" && argc > 2) {
+  if (mode == "-b") {
     beta = atof(argv[argi]);
     argi = argi + 1;
   }
   if (argc >= argi + 1) {
-    dirX_0 = atof(argv[argi]);
-    dirY_0 = atof(argv[argi + 1]);
+    xdir = atof(argv[argi]);
+    ydir = atof(argv[argi + 1]);
     argi = argi + 2;
   }
   if (argc >= argi + 1) {
-    x_0 = atof(argv[argi]);
-    y_0 = atof(argv[argi + 1]);
+    xpos = atof(argv[argi]);
+    ypos = atof(argv[argi + 1]);
     argi = argi + 2;
   }
   if (mode != "-mp") {
-    cout << "XDir: " << dirX_0 << endl;
-    cout << "YDir: " << dirY_0 << endl;
-    cout << "XPos: " << x_0 << endl;
-    cout << "YPos: " << y_0 << endl;
-    double dirZ_0 = sqrt(1. - dirX_0*dirX_0 - dirY_0*dirY_0);
-    pos0 = TVector3(x_0, y_0, 0);
-    dir0 = TVector3(dirX_0, dirY_0, dirZ_0).Unit();    
+    cout << "XDir: " << xdir << endl;
+    cout << "YDir: " << ydir << endl;
+    cout << "XPos: " << xpos << endl;
+    cout << "YPos: " << ypos << endl;
+    double zdir = sqrt(1. - xdir*xdir - ydir*ydir);
+    pos0 = TVector3(xpos, ypos, 0);
+    dir0 = TVector3(xdir, ydir, zdir).Unit();    
   }
 
   // Do the thing
@@ -617,28 +628,32 @@ int main(int argc, char *argv[]) {
   if (mode == "-mp") {
     testIdentifyMultiParticle(nDetected);
   }
-  if (mode == "-g" || mode == "-b") {
-    // Given particle and momentum, simulate centered beam à la Geant4
-    if (mode == "-g") {
-      beta = calcBeta(particlei, particleMom);
-      cout << "Beta: " << beta << endl;
-    }
+  if (mode == "-p") {
+    beta = calcBeta(particlei, particleMom);
+    cout << "Beta: " << beta << endl;
+  }
+  if (mode == "-p" || mode == "-b") {
     Arich* arich = new Arich();
     particleInfoStruct params;
     params.pos = pos0;
     params.dir = dir0;
     params.beta = beta;
-    //arich->generateEvent(hypothesis, true);
-    arich->simulateBeam(params, analysisDir);
-    //arich->calculatePdf(hypothesis);
+    arich->simulateBeam(params, outputDir);
   }
 
-  if (mode == "-p") {
-    testIdentifyParticle(particlei, particleMom, pos0,  dir0);
+  if (mode == "-pid") {
+    testIdentifyParticle(particlei, particleMom, pos0, dir0, outputDir);
+  }
+
+  if (mode == "-id") {
+    TFile* eventFile = TFile::Open(fileName);
+    TH2D* eventHist = (TH2D*) eventFile->Get(histName);
+
+    identifyParticle(eventHist, particleMom, pos0, dir0);
   }
 
   if (mode == "-s") {
-    calculateSeparationHists(particleMom, pos0, dir0, analysisDir);
+    calculateSeparationHists(particleMom, pos0, dir0, outputDir);
   }
 
   if (mode == "-gpdf") {
@@ -646,9 +661,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (mode == "-km") {
-    generateKaonMultiHists(analysisDir, fileName);
+    generateKaonMultiHists(outputDir, fileName);
   }
-
 
   auto duration = duration_cast<microseconds>( high_resolution_clock::now() - t1 ).count();
   cout << "Time taken: " << duration / 1000000. << endl;
