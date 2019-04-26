@@ -11,6 +11,7 @@ static TMatrixD makeRotationMatrix(TVector3 dir) {
   Rotation matrix to rotate (x,y,z)=(0,0,1) onto dir
   https://math.stackexchange.com/questions/180418
   https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula#Matrix_notation
+  Could also use ROOT's TVector3::RotateUz() instead
   */
 
   TMatrixD rot(3, 3);

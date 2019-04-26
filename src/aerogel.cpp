@@ -229,11 +229,13 @@ void Aerogel::applyPhotonScatter(Photon* photon) {
     // update position
     photon->pos = newPos;
     // update direction
-    TMatrixD rotMatrix = makeRotationMatrix(photon->dir);
     double scatTheta = getRandomScatAngle();
     double scatPhi = randomGenerate->Uniform(0., 2.*TMath::Pi());
-    photon->dir = rotateVector(rotMatrix, scatTheta, scatPhi).Unit();
-
+    TVector3 dirScat = TVector3(sin(scatTheta)*cos(scatPhi),
+                                sin(scatTheta)*sin(scatPhi),
+                                cos(scatTheta));
+    dirScat.RotateUz(photon->dir);
+    photon->dir = dirScat;
     // Predict where it might scatter next
     photon->numScatters += 1;
     intDist = getRandomIntDistance(photon->wav);

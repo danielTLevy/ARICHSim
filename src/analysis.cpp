@@ -73,11 +73,10 @@ TH2D* geant4Pdf(TFile* g4File, int particlei) {
 }
 
 
-
 double computeLogLikelihood(TH2D* event, TH2D* distribution) {
   /*
   Compare every bin of an event histogram to a bin in some probability distribution,
-  to give the likelihood of that event under that distribution
+  to give the negative log-likelihood of that event under that distribution
   */
   int nBins = event->GetSize();
   int test = distribution->GetSize();
