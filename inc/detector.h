@@ -1,9 +1,10 @@
 #ifndef DETECTOR_INCLUDE
 #define DETECTOR_INCLUDE
 
-//Root
 #include "TMath.h"
 #include "TGraph.h"
+#include "TH2D.h"
+#include "TH1D.h"
 #include "utility.h"
 #include "beam.h"
 #include "photon.h"

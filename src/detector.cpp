@@ -63,6 +63,11 @@ double Detector::evalQEff(double wav) {
 
 
 void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons, TH1D* rHist) {
+  /*
+  Project photons onto histogram representing detector plane
+  Optional mirror on edges of detector plane
+  Optional 1-D histogram reperesenting the distance of each photon to the center of the plane
+  */
   for (int j = 0; j < photons.size(); j++) {
     Photon* ph = photons[j];
     // Get distance to each wall in direction of travel
@@ -75,8 +80,9 @@ void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons, TH
     ph->travelDist(dists[minDistDimension]-0.00001);
 
     if (mirror) {
+      // Continuously reflect until photon hits detector plane
       TVector3 incidentPlane;
-      int counter = 0;
+      int counter = 0; // Cap it at 10 reflections
       while (minDistDimension != 2 && counter < 10) {
         // Get the normal vector of that wall
         incidentPlane = TVector3(0.,0.,0.);
@@ -88,7 +94,6 @@ void Detector::projectPhotons(TH2D* photonHist, std::vector<Photon*> photons, TH
         dists[1] = (TMath::Sign(ymax, ph->dir[1]) - ph->pos[1]) / ph->dir[1];
         dists[2] = (zPos - ph->pos[2]) / ph->dir[2];
         minDistDimension = TMath::LocMin(3, dists);
-
         ph->travelDist(dists[minDistDimension]);
         counter++;
       }

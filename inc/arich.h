@@ -28,6 +28,7 @@
 #include "detector.h"
 
   struct particleInfoStruct {
+    // Input parameters to a simple fast simulation
     TVector3 pos;
     TVector3 dir;
     double beta;
@@ -70,16 +71,16 @@
 class Arich {
 
 private:
-  static constexpr double aeroPos1 = 0.; // positions of aerogel planes
+  static constexpr double aeroPos1 = 0.; // positions of upstream edges of aerogel layers
   static constexpr double aeroPos2 = 2.;
-  static constexpr double thickness = 2.0; // thickness of aerogel layer
+  static constexpr double thickness1 = 2.0; // thickness of aerogel layers
+  static constexpr double thickness2 = 2.0;
   static constexpr double width = 10.; // x width of aerogel
   static constexpr double height = 10.; // y height of aerogel
   static constexpr double n1 = 1.0352; // outer index of refraction
   static constexpr double n2 = 1.0452; // inner index of refraction
   static constexpr double detectorDist = 21.0; // dist to detector plane
 
-  Beam* beam;
   Aerogel* aerogel1;
   Aerogel* aerogel2;
   Detector* detector;
@@ -90,7 +91,7 @@ public:
   Arich(bool mirror = false);
   TH2D* calculatePdf(particleInfoStruct params, char* histName="photonHist");
   TH2D* generateEvent(particleInfoStruct params, bool save=true, char* histName="generatedEvent");
-  TH2D* simulateBeam(particleInfoStruct params);
+  TH2D* simulateBeam(particleInfoStruct params, char* outputDir="simulatedBeam");
 };
 
 #endif

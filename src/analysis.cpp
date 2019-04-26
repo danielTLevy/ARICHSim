@@ -415,14 +415,15 @@ void testIdentifyParticle(int particlei, double particleMom, TVector3 pos0, TVec
 
 
 void identifyMultiParticle(TH2D* eventHist, int nDetected, vector<int> particleis, vector<double> particleMoms,
-                           vector<TVector3> pos0s, vector<TVector3> dir0s, double errMom=0.5) {
+                           vector<TVector3> pos0s, vector<TVector3> dir0s) {
   /*
-  Run multidimensional particle identification
+  Run multidimensional particle identification:
+  Given event histogram and vectors of of particles momenta, positions, dirs,
+  print out most likely partiles that generated event histogram
   */
-  THStack *hs = new THStack("pdfStack","");
   Arich* arich = new Arich();
   // Calculate a PDF for each individual detected particle, for each hypothesis
-  vector< vector<TH2D*> > calculatedPdfs;
+  vector<vector<TH2D*>> calculatedPdfs;
   for (int i = 0; i < nDetected; i++) {
     vector<TH2D*> particleiCalculatedPdfs;
     particleInfoStruct hypothesis;
@@ -439,6 +440,7 @@ void identifyMultiParticle(TH2D* eventHist, int nDetected, vector<int> particlei
   int numCombinations = TMath::Power(NUMPARTICLES, nDetected);
   double minLoglikelihood = 1E10;
   int bestCombination[nDetected];
+  THStack *hs;
   for (int i = 0; i < numCombinations; i++) {
     int index = i;
     delete hs;
@@ -479,15 +481,20 @@ void identifyMultiParticle(TH2D* eventHist, int nDetected, vector<int> particlei
 }
 
 void testIdentifyMultiParticle(int nDetected) {
-  // Simulate multiparticle event, and test our ability to identify it
+  /*
+  In order to demonstrate multiparticle fitting:
+  Randomly throw nDetected particles, create photon distribution
+  Print out real and expected particles that generated this distribution
+  */
+  Arich* arich = new Arich();
   THStack histStack("eventStack","");
   vector<int> particles;
   vector<TVector3> pos0s;
   vector<TVector3> dir0s;
   vector<double> moms;
-  Arich* arich = new Arich();
   TRandom3 randomGen = TRandom3();
   for (int i = 0; i < nDetected; i++) {
+    // Randomly pick particle ID, momentum, position, direction
     int particlei = randomGen.Integer(NUMPARTICLES);
     double momentumi = randomGen.Gaus(10, 2);
     double betai = calcBeta(particlei, momentumi);
@@ -499,18 +506,19 @@ void testIdentifyMultiParticle(int nDetected) {
     }
     dir0i[2] = sqrt(1-dir0i[0]*dir0i[0]-dir0i[1]*dir0i[0]);
     pos0i[2] = 0;
-
-    particleInfoStruct hypothesis;
-    hypothesis.pos = pos0i;
-    hypothesis.dir = dir0i;
-    hypothesis.beta = betai;
-
-    histStack.Add(arich->generateEvent(hypothesis, false, Form("generatedEvent%i", i)));
     particles.push_back(particlei);
     pos0s.push_back(pos0i);
     dir0s.push_back(dir0i);
     moms.push_back(momentumi);
+    particleInfoStruct hypothesis;
+    hypothesis.pos = pos0i;
+    hypothesis.dir = dir0i;
+    hypothesis.beta = betai;
+    // Generate resulting photon distribution
+    histStack.Add(arich->generateEvent(hypothesis, false, Form("generatedEvent%i", i)));
+
   }
+  // Save summed photon distribution
   TH2D* eventHist = (TH2D*) histStack.GetStack()->Last();
   eventHist->SetName("stackedEvents");
   eventHist->SetTitle("stackedEvents");
@@ -528,7 +536,7 @@ void testIdentifyMultiParticle(int nDetected) {
 int main(int argc, char *argv[]) {
   if (argc == 1) {
     cerr << "Usage: " << argv[0] << endl
-         << "Make pdf given particle and momentum:  -g <pid> <mom> [xdir ydir xpos ypos]" << endl
+         << "Make pdf given particle and momentum:  -g <outputdir> <pid> <mom> [xdir ydir xpos ypos]" << endl
          << "Make pdf given beta:                   -b [beta xdir ydir xpos ypos]" << endl
          << "Run particle identification:           -p <pid> <mom> [xdir ydir xpos ypos]" << endl
          << "Run multi-particle identification:     -mp <nDetected>" << endl
@@ -562,7 +570,7 @@ int main(int argc, char *argv[]) {
     g4File = TFile::Open(argv[argi]);
     argi = argi + 1;
   }
-  if (mode == "-s" || mode == "-km") {
+  if (mode == "-s" || mode == "-km" || mode=="-g") {
     analysisDir = argv[argi];
     argi = argi + 1;
   }
@@ -621,7 +629,7 @@ int main(int argc, char *argv[]) {
     params.dir = dir0;
     params.beta = beta;
     //arich->generateEvent(hypothesis, true);
-    arich->simulateBeam(params);
+    arich->simulateBeam(params, analysisDir);
     //arich->calculatePdf(hypothesis);
   }
 

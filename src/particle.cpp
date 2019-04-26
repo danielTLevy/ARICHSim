@@ -17,7 +17,7 @@ double Particle::phi() {
 }
 
 double Particle::dist(double z) {
-  // distance to plane in direction of travel
+  // distance to some z position in direction of travel
   return (z - pos[2]) / dir[2];
 }
 
@@ -29,7 +29,7 @@ void Particle::travelDist(double dist) {
 }
 
 void Particle::travelZDist(double zDist) {
-  // Travel some distance in the direction of travel
+  // Travel some distance downstream
   pos[0] = pos[0] + zDist*dir[0]/dir[2];
   pos[1] = pos[1] + zDist*dir[1]/dir[2];
   pos[2] = pos[2] + zDist;

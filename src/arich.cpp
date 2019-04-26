@@ -2,8 +2,8 @@
 using namespace std;
 
 Arich::Arich(bool mirror) {
-  this->aerogel1 = new Aerogel(n1, thickness, aeroPos1);
-  this->aerogel2 = new Aerogel(n2, thickness, aeroPos2);
+  this->aerogel1 = new Aerogel(n1, thickness1, aeroPos1);
+  this->aerogel2 = new Aerogel(n2, thickness2, aeroPos2);
   this->detector = new Detector(detectorDist, mirror);
   aerogel1->setDownIndex(n2);
   aerogel2->setUpIndex(n1);
@@ -20,7 +20,7 @@ double Arich::integrateAndDrawEllipse(particleInfoStruct params, TH2D* photonHis
   double dirY_0 = params.dir[1];
   double dirZ_0 = params.dir[2];
   // Naively assume that all photons are generated in middle of second aerogel layer.
-  double middlePoint = thickness + thickness / 2.;
+  double middlePoint = thickness1 + thickness2 / 2.;
   double newX_0 = params.pos[0] + middlePoint*dirX_0/dirZ_0;
   double newY_0 = params.pos[1] + middlePoint*dirY_0/dirZ_0;
   double newDist = detectorDist - middlePoint;
@@ -96,7 +96,7 @@ TH2D* Arich::calculatePdf(particleInfoStruct params, char* histName) {
     aerogel1->exitAerogel(photons, true);
     aerogel2->applyPhotonScatters(photons);
     aerogel2->exitAerogel(photons, true);
-    // Project photons onto detector and plot distribution
+    // Project photons onto 00 and plot distribution
     detector->projectPhotons(photonHist, photons);
     // delete
     for (int j = 0; j < photons.size(); j++) {
@@ -112,7 +112,9 @@ TH2D* Arich::calculatePdf(particleInfoStruct params, char* histName) {
 }
 
 TH2D* Arich::generateEvent(particleInfoStruct params, bool save, char* histName) {
-  // Generate a single particle event
+  /*
+  Simulate a photon distribution resulting from a single particle
+  */
   Beam *beam = new Beam(params.pos, params.dir, params.beta);
   Particle *pa = beam->generateParticle();
   // Make photons in first aerogel
@@ -151,13 +153,18 @@ TH2D* Arich::generateEvent(particleInfoStruct params, bool save, char* histName)
   return photonHist;
 }
 
-TH2D* Arich::simulateBeam(particleInfoStruct params) {
+TH2D* Arich::simulateBeam(particleInfoStruct params, char* outputDir) {
+  /*
+  Plot and save info into some output directory
+  Including TTree holding photon and particle info, and final photon distribution
+  */
   double nEvents = 10000;
   // Make beam
   Beam *beam = new Beam(params.pos, params.dir, params.beta);
-  // Get plots ready
-  TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
 
+  // Get plots ready
+  TFile *f = new TFile(Form("./output/%s.root", outputDir), "RECREATE");
+  TH2D *photonHist = detector->makeDetectorHist("photonHist","photonHist");
   photonHist->SetXTitle("x [cm]");
   photonHist->SetYTitle("y [cm]");
   TH1D *rHist = new TH1D("rHist", "rHist", 500, 0., 10.);
@@ -165,7 +172,6 @@ TH2D* Arich::simulateBeam(particleInfoStruct params) {
   // Make a tree to save the photons
   photonStruct phStruct;
   particleStruct paStruct;
-  TFile *f = new TFile("./output/photons.root","RECREATE");
   TTree *tree = new TTree("T","Output photon data");
   TBranch *phBranch = tree->Branch("photons",&phStruct.dirxi,
     "dirxi/D:diryi:dirzi:posxi:posyi:poszi:dirxe:dirye:dirze:posxe:posye:posze:wav:paid/i:numscat");
@@ -289,17 +295,11 @@ TH2D* Arich::simulateBeam(particleInfoStruct params) {
   rHist->Draw("bar");
 
 
-  c1->SaveAs("./output/photonHistWithProjections.root");
-  c1->SaveAs("./output/photonHistWithProjections.pdf");
-  rHist->SaveAs("./output/rHist.root");
-  photonHist->SaveAs("./output/photonHist.root");
+  c1->Write();
+  rHist->Write();
+  photonHist->Write();
 
   f->Write();
-
-  delete beam;
-  delete aerogel1;
-  delete aerogel2;
-  delete detector;
 
   return photonHist;
 }
