@@ -39,10 +39,36 @@ double calcBeta(int particlei, double mom) {
   return sqrt(1/(1 + M*M/(mom*mom)));
 }
 
+double computeLogLikelihood(TH2D* event, TH2D* distribution) {
+  /*
+  Compare every bin of an event histogram to a bin in some probability distribution,
+  to give the negative log-likelihood of that event under that distribution
+  */
+  int nBins = event->GetSize();
+  int test = distribution->GetSize();
+  if (nBins != distribution->GetSize()) {
+      cerr << "ERROR: Bin Mismatch" << endl;
+      throw "Bin Mismatch Error";
+  }
+  double logLikelihood = 0.;
+  for (int i = 0; i < nBins; i++) {
+      double lambda = distribution->GetBinContent(i);
+      bool pixelHit = event->GetBinContent(i) > 0;
+      if (pixelHit) {
+        logLikelihood += log(1 - exp(-lambda));
+      } else {
+        logLikelihood += log(exp(-lambda));
+      }
+  }
+  return -2*logLikelihood;
+}
 
-TH2D* geant4Pdf(TFile* g4File, int particlei) {
-  const char* particle = PNAMES[particlei];
-  char* filename = Form("%sG4Pdf", particle);
+TH2D* geant4Pdf(char* outputDir, TFile* g4File) {
+  /*
+  Given TTree generated with DetectorSim containing information on simulated optical photons,
+  project photons and produce histogram of photon hit distribution
+  */
+  char* filename = "G4Pdf";
   // Prepare values to update in our loop
   TTreeReader reader("h1000", g4File);
   TTreeReaderValue<Int_t> raPid(reader, "Pid");
@@ -67,34 +93,8 @@ TH2D* geant4Pdf(TFile* g4File, int particlei) {
       Double_t yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
       allEventHist->Fill(xFinal, yFinal, efficiency/10000.);
   }
-
-  allEventHist->SaveAs(Form("./output/geant4pdfs/%s.root", filename));
+  allEventHist->SaveAs(Form("./output/%s/%s.root",outputDir, filename));
   return allEventHist;
-}
-
-
-double computeLogLikelihood(TH2D* event, TH2D* distribution) {
-  /*
-  Compare every bin of an event histogram to a bin in some probability distribution,
-  to give the negative log-likelihood of that event under that distribution
-  */
-  int nBins = event->GetSize();
-  int test = distribution->GetSize();
-  if (nBins != distribution->GetSize()) {
-      cerr << "ERROR: Bin Mismatch" << endl;
-      throw "Bin Mismatch Error";
-  }
-  double logLikelihood = 0.;
-  for (int i = 0; i < nBins; i++) {
-      double lambda = distribution->GetBinContent(i);
-      bool pixelHit = event->GetBinContent(i) > 0;
-      if (pixelHit) {
-        logLikelihood += log(1 - exp(-lambda));
-      } else {
-        logLikelihood += log(exp(-lambda));
-      }
-  }
-  return -2*logLikelihood;
 }
 
 void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char* analysisDir) {
@@ -199,58 +199,10 @@ void calculateAllLoglikes(double particleMom, TVector3 pos0, TVector3 dir0, char
   tree->Write();
 }
 
-void generateKaonMultiHists(char* analysisDir, char* fileName) {
-  // Read Geant4 file, save all photon events where kaons enter aerogel
-  TFile* g4File = TFile::Open(Form("%s%s.root", analysisDir, fileName));
-  TTree* h1000 = (TTree*) g4File->Get("h1000");
-  // Get "Interesting" events, where Kaons go into aerogel
-  int nKaonEvents = h1000->Draw("EventNumber", "Pid==321 && StateID==17");
-  double* eventNumbers = h1000->GetV1();
-  std::deque<int> kaonEventNumbers(h1000->GetV1(), h1000->GetV1()+nKaonEvents);
-
-  TTreeReader reader("h1000", g4File);
-  TTreeReaderValue<Int_t> rvEvent(reader, "EventNumber");
-  TTreeReaderValue<Int_t> rvPid(reader, "Pid");
-  TTreeReaderArray<Double_t> raMom(reader, "Mom");
-  TTreeReaderArray<Double_t> raPos(reader, "Pos");
-  TTreeReaderArray<Double_t> raDir(reader, "Dir");
-  TRandom3 randomGen = TRandom3();
-  Detector* detector = new Detector(0);
-  TH2D *g4EventHist = new TH2D("g4EventHist","g4EventHist",48,-15,15,48,-15,15);
-  int currEventId = kaonEventNumbers.front();
-  kaonEventNumbers.pop_front();
-  while (reader.Next() && !kaonEventNumbers.empty()) {
-    // Get only forward-exiting optical photons
-    if (*rvPid != 0 || raPos[2] < 829.99 ) {
-        continue;
-    }
-    if (*rvEvent ==  kaonEventNumbers.front()) {
-      g4EventHist->SaveAs(Form("%sExample%d.root", analysisDir, *rvEvent));
-      g4EventHist->Reset();
-      currEventId = kaonEventNumbers.front();
-      kaonEventNumbers.pop_front();
-    }
-    if (*rvEvent == currEventId) {
-       // Fill our event Histogram
-      // Momentum in GeV/c:
-      double momMag = sqrt(raMom[0]*raMom[0] + raMom[1]*raMom[1] + raMom[2]*raMom[2]);
-      // Wavelength in m
-      double wav = SPEEDOFLIGHT * PLANCKSCONST / (1E9 * momMag);
-      double efficiency = DETECTORFILL * detector->evalQEff(wav);
-      if ( randomGen.Uniform() < efficiency) {
-        // Project onto detector, and convert from mm to cm
-        double xFinal = 0.1*(raPos[0] + (1000. - raPos[2])*raDir[0]/raDir[2]);
-        double yFinal = 0.1*(raPos[1] + (1000. - raPos[2])*raDir[1]/raDir[2]);
-        g4EventHist->Fill(xFinal, yFinal);
-      }
-    }
-  }
-}
-
 void calculateSeparationHists(double particleMom, TVector3 pos0, TVector3 dir0, char* analysisDir) {
   /*
   Compare each particle geant4 root file to a different simulated particle PDF
-  //Requires an analysisDir in the out directory
+  Requires an analysisDir in the out directory
     - This contains a directory "g4" which contains all the ttrees for the geant4
   Outputs loglikelihood ratio for each particle pair, and each of the PDFs
   */
@@ -547,7 +499,7 @@ int main(int argc, char *argv[]) {
          << "Test particle identification:          -pid <pid> <mom> [xdir ydir xpos ypos]" << endl
          << "Test multi-particle identification:    -mp <nDetected>" << endl
          << "Identify from photon histogram:        -id <eventFile> <histname> <mom> <xdir> <ydir> <xpos> <ypos>" << endl        
-         << "Make PDF given Geant4 TTree:           -gpdf <g4filename> <pid>" << endl
+         << "Make PDF given Geant4 TTree:           -gpdf <g4file> <outputdir>" << endl
          << "Check loglikes for each particle:      -s <analysisdir> <mom> [xdir ydir xpos ypos]" << endl;
     return -1;
   }
@@ -579,11 +531,11 @@ int main(int argc, char *argv[]) {
     g4File = TFile::Open(argv[argi]);
     argi = argi + 1;
   }
-  if (mode=="-p" || mode=="-b" ||mode == "-s" || mode == "-km" || mode=="-g" || mode == "-pid") {
+  if (mode=="-p" || mode=="-b" ||mode == "-s" || mode == "-pid" || mode=="-gpdf") {
     outputDir = argv[argi];
     argi = argi + 1;
   }
-  if (mode == "-km" || mode == "-id") {
+  if (mode == "-id") {
     fileName = argv[argi];
     histName = argv[argi+1];
     argi = argi + 2;
@@ -656,11 +608,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (mode == "-gpdf") {
-    geant4Pdf(g4File, particlei);
-  }
-
-  if (mode == "-km") {
-    generateKaonMultiHists(outputDir, fileName);
+    geant4Pdf(outputDir, g4File);
   }
 
   auto duration = duration_cast<microseconds>( high_resolution_clock::now() - t1 ).count();

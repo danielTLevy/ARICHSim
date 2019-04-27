@@ -93,5 +93,4 @@ static TCutG *createCutFromEllipse(TEllipse *ellipse) {
 }
 
 
-
 #endif
